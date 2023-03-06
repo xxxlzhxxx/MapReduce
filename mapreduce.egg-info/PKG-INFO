@@ -1,0 +1,5 @@
+Metadata-Version: 2.1
+Name: mapreduce
+Version: 1.0.0
+Summary: EECS 485 MapReduce
+Requires-Python: >=3.8

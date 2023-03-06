@@ -1,0 +1,7 @@
+click
+pycodestyle
+pydocstyle
+pylint
+mypy
+pytest
+pytest-mock
