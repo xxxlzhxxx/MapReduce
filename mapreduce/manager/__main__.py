@@ -5,6 +5,7 @@ import logging
 import json
 import time
 import click
+import pathlib
 import mapreduce.utils
 
 
