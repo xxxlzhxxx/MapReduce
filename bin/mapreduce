@@ -1,0 +1,9 @@
+#!/bin/bash
+
+set -Eeuo pipefail
+pgrep -f mapreduce-manager  # check if you already started it
+pgrep -f mapreduce-worker  # check if you already started it
+mapreduce-manager &
+mapreduce-worker --port 6001 &
+mapreduce-worker --port 6002 &
+mapreduce-submit --mapper tests/testdata/exec/wc_map.sh --reducer tests/testdata/exec/wc_reduce.sh
