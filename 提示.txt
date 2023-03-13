@@ -1,0 +1,26 @@
+
+
+a thread in the MapReduce manager might repeatedly check if it should shut down.
+
+In EECS 485, you can avoid busy-waiting with Python's time.sleep(). 
+The sleep() function gives up execution for a period of time, avoiding high CPU consumption.
+
+
+Thread: 
+    A.join()
+
+    await busy waiting:
+        time.sleep(0.1)
+
+Socket:
+    # 用 contex manager 无需 close
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        s.bind((HOST, PORT))
+        s.listen()
+        conn, addr = s.accept()
+        with conn:
+            # 又创建了一个新的 socket obj
+
+
+
+

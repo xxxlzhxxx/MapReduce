@@ -5,7 +5,8 @@ import json
 import time
 import click
 import mapreduce.utils
-
+import socket
+import threading
 
 # Configure logging
 LOGGER = logging.getLogger(__name__)
@@ -34,6 +35,20 @@ class Worker:
 
         # TODO: you should remove this. This is just so the program doesn't
         # exit immediately!
+        
+        # TCP Thread listening (busy, ready)
+
+        # UDP Heartbeat Thread 
+        # {
+        #    "message_type": "heartbeat",
+        #    "worker_host": string,
+        #    "worker_port": int
+        # }
+        self.tcp_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        
+
+        
+
         LOGGER.debug("IMPLEMENT ME!")
         time.sleep(120)
 

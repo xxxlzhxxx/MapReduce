@@ -7,6 +7,8 @@ import time
 import click
 import pathlib
 import mapreduce.utils
+import threading
+import socket
 
 
 # Configure logging
@@ -34,8 +36,49 @@ class Manager:
 
         # TODO: you should remove this. This is just so the program doesn't
         # exit immediately!
+
+        # 1.Create a new thread, which will listen for UDP heartbeat messages from the Workers.
+        # Initialize the UDP server socket for receiving heartbeats from workers
+        self.udp_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        self.udp_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        with self.udp_socket:
+            self.udp_socket.bind((host, port))
+
+        # 2.Create a new TCP socket on the given port and call the listen() function. 
+        self.tcp_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.tcp_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        with self.tcp_socket:
+            self.tcp_socket.bind((host, port))
+            self.tcp_socket.listen()
+
+        # Start the TCP and UDP server threads
+        self.tcp_thread = threading.Thread(target=self.tcp_server)
+        self.udp_thread = threading.Thread(target=self.udp_server)
+        self.tcp_thread.start()
+        self.udp_thread.start()
+
+
+        #   Note: only one listen() thread should remain open for the whole lifetime of the Manager.
+
+        # 4. wait for the incomming message
+
+        # TCP thread listening
+
+
+        # UDP thread listening, if one miss 5, it dies
+
         LOGGER.debug("IMPLEMENT ME!")
         time.sleep(120)
+
+    def tcp_server(self):
+        pass
+
+    def udp_server(self):
+        pass
+
+    def shutdown(self):
+        message = {"message_type": "shutdown"}
+        # send this message to all the workers
 
 
 @click.command()

@@ -1,13 +1,38 @@
 #!/bin/bash
 
 set -Eeuo pipefail
+
+if [ $1 -eq "start" ]
+then
 pgrep -f mapreduce-manager  # check if you already started it
 pgrep -f mapreduce-worker  # check if you already started it
 
-
+# Exit 1 if a Manager or Worker is already running. Otherwise, execute the following commands.
+echo "starting mapreduce ..."
 mkdir -p var/log
 rm -f var/log/mapreduce-manager.log var/log/mapreduce-worker-6002.log var/log/mapreduce-worker-6001.log
 mapreduce-manager --host localhost --port 6000 --logfile var/log/mapreduce-manager.log &
 sleep 2  # give the Manager time to start
 mapreduce-worker --host localhost --port 6001 --manager-host localhost --manager-port 6000 --logfile var/log/mapreduce-worker-6001.log &
 mapreduce-worker --host localhost --port 6002 --manager-host localhost --manager-port 6000 --logfile var/log/mapreduce-worker-6002.log &
+
+fi
+
+if [ $1 -eq "" ]
+then
+set +o pipefail  # Avoid erroneous failures due to grep returning non-zero
+if nc -h 2>&1 | grep -q "\-c"; then
+  NC="nc -c"
+elif nc -h 2>&1 | grep -q "\-N"; then
+  NC="nc -N"
+elif nc -h 2>&1 | grep -q "\-C"; then
+  NC="nc -C"
+else
+  echo "Error detecting netcat version."
+  exit 1
+fi
+set -o pipefail
+
+echo '{"message_type": "shutdown"}' | $NC localhost 6000 || true
+sleep 2  # give the Manager time to receive signal and send to Workers
+fi
