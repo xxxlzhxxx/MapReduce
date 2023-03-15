@@ -35,22 +35,81 @@ class Worker:
 
         # TODO: you should remove this. This is just so the program doesn't
         # exit immediately!
-        
-        # TCP Thread listening (busy, ready)
 
-        # UDP Heartbeat Thread 
-        # {
-        #    "message_type": "heartbeat",
-        #    "worker_host": string,
-        #    "worker_port": int
-        # }
+        self.port = port
+        self.host = host
+        self.manager_port = manager_port
+        self.manager_host = manager_host
+
+        # Create a new TCP socket server
         self.tcp_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        
+        self.tcp_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        tcp_thread = threading.Thread(target=self.tcp_server)
+        tcp_thread.start()
+        tcp_thread.join()
 
+
+        # create UDP socket
+        self.udp_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        self.udp_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        self.udp_socket.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
+        self.udp_socket.bind((self.worker_host, self.worker_port))
+
+        # connect to Manager
+        self.tcp_socket.connect((self.manager_host, self.manager_port))
         
 
         LOGGER.debug("IMPLEMENT ME!")
         time.sleep(120)
+
+
+
+    def tcp_server(self):
+        """create an infinite loop to listen."""
+        with self.tcp_socket:
+            self.tcp_socket.connect((self.manager_host, self.manager_port))
+
+
+            self.tcp_socket.bind((self.host, self.port))
+            self.tcp_socket.listen()
+
+            while not self.shutdown:
+                # Wait for a connection for 1s.  The socket library avoids consuming
+                # CPU while waiting for a connection
+                try:
+                    conn, addr = self.tcp_socket.accept()
+                except socket.timeout:
+                    continue
+
+                # Socket recv() will block for a maximum of 1 second.  If you omit
+                # this, it blocks indefinitely, waiting for packets.
+                conn.settimeout(1)
+                # Receive the worker's registration message
+
+                with conn:
+                    message_chunks = []
+                    while True:
+                        try:
+                            data = conn.recv(4096)
+                        except self.tcp_socket.timeout:
+                            continue
+                        if not data:
+                            break
+                        message_chunks.append(data)
+
+                    # Decode list-of-byte-strings to UTF8 and parse JSON data
+                    message_bytes = b''.join(message_chunks)
+                    message_str = message_bytes.decode("utf-8")
+
+                    try:
+                        message_dict = json.loads(message_str)
+                    except json.JSONDecodeError:
+                        continue
+                    
+
+                
+            # handle busy waiting     
+            time.sleep(0.1)
 
 
 @click.command()

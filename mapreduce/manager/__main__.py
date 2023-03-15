@@ -9,6 +9,7 @@ import pathlib
 import mapreduce.utils
 import threading
 import socket
+import string
 
 
 # Configure logging
@@ -34,51 +35,155 @@ class Manager:
         }
         LOGGER.debug("TCP recv\n%s", json.dumps(message_dict, indent=2))
 
-        # TODO: you should remove this. This is just so the program doesn't
-        # exit immediately!
 
-        # 1.Create a new thread, which will listen for UDP heartbeat messages from the Workers.
-        # Initialize the UDP server socket for receiving heartbeats from workers
-        self.udp_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        self.udp_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        with self.udp_socket:
-            self.udp_socket.bind((host, port))
+        # begin --------------------------------------------------------------------------------
+        # create an array to store all the info of workers
+        self.port = port
+        self.host = host
+        self.workers = {}
+        self.worder_thread = []
+        self.shutdown = False
 
-        # 2.Create a new TCP socket on the given port and call the listen() function. 
+        # Create a new TCP socket server
         self.tcp_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.tcp_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        with self.tcp_socket:
-            self.tcp_socket.bind((host, port))
-            self.tcp_socket.listen()
-
-        # Start the TCP and UDP server threads
-        self.tcp_thread = threading.Thread(target=self.tcp_server)
-        self.udp_thread = threading.Thread(target=self.udp_server)
-        self.tcp_thread.start()
-        self.udp_thread.start()
+        tcp_thread = threading.Thread(target=self.tcp_server)
+        tcp_thread.start()
+        tcp_thread.join()
+        
+        
+        # Create a new UDP socket server
+        self.udp_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        self.udp_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        udp_thread = threading.Thread(target=self.udp_server)
+        udp_thread.start()
+        udp_thread.join()
 
 
         #   Note: only one listen() thread should remain open for the whole lifetime of the Manager.
-
-        # 4. wait for the incomming message
-
-        # TCP thread listening
-
-
-        # UDP thread listening, if one miss 5, it dies
-
         LOGGER.debug("IMPLEMENT ME!")
         time.sleep(120)
 
+
+
     def tcp_server(self):
-        pass
+        """create an infinite loop to listen."""
+        with self.tcp_socket:
+            self.tcp_socket.bind((self.host, self.port))
+            self.tcp_socket.listen()
+
+            self.tcp_socket.settimeout(1)
+            
+            while not self.shutdown:
+                # Accept a connection from a worker
+                try:
+                    conn, addr = self.tcp_socket.accept()
+                except socket.timeout:
+                    continue
+
+                # Socket recv() will block for a maximum of 1 second.  If you omit
+                # this, it blocks indefinitely, waiting for packets.
+                conn.settimeout(1)
+                # Receive the worker's registration message
+
+                with conn:
+                    message_chunks = []
+                    while True:
+                        try:
+                            data = conn.recv(4096)
+                        except self.tcp_socket.timeout:
+                            continue
+                        if not data:
+                            break
+                        message_chunks.append(data)
+
+                    # Decode list-of-byte-strings to UTF8 and parse JSON data
+                    message_bytes = b''.join(message_chunks)
+                    message_str = message_bytes.decode("utf-8")
+
+                    try:
+                        message_dict = json.loads(message_str)
+                    except json.JSONDecodeError:
+                        continue
+                    
+                    
+                    # Add the worker to the list of registered workers
+                    if message_dict['message_type'] == 'register':
+                        self.register(message_dict, conn, addr)
+                        
+                    # receive shutdown message, send shut down message to every worker
+                    elif message_dict['message_type'] == 'shutdown':
+                        self.shutdown()
+                    
+                    # TODO: manager handle new job
+                    elif message_dict['message_type'] == 'new_manager_job':
+                        self.handle_new_job()
+
+                    # TODO: handle input partitioning
+                    elif message_dict['message_type'] == 'new_map_task':
+                        self.handle_partitioning()
+ 
+                
+            # handle busy waiting     
+            time.sleep(0.1)
+
+        
 
     def udp_server(self):
-        pass
+        with self.udp_socket:
+            self.udp_socket.bind((self.host, self.port))
+            self.udp_socket.settimeout(1)
+
+            while not self.shutdown:
+                try:
+                    message_bytes = self.udp_server.recv(4096)
+                except socket.timeout:
+                    continue
+                message_str = message_bytes.decode("utf-8")
+                message_dict = json.loads(message_str)
+                # detect whether a worker is dead
+
+                # handle busy waiting
+                time.sleep(0.1)
+
+
+
+
+    def register(self, message_dict, conn, addr):
+        # handle registration
+        self.workers[addr] = {
+            'worker_host': message_dict['worker_host'],
+            'worker_post': message_dict['worker_port'],
+            'socket': conn,
+            'status': 'active',
+            'tasks': [],
+            'last_heartbeat': time.time(),
+            'num_completed_tasks': 0
+        }
+
+        # Send an acknowledgement back to the worker
+        ack_msg = {
+            "message_type": "register_ack",
+            "worker_host": self.worker['worker_host'],
+            "worker_port": self.worder['worker_port'],
+        }
+        conn.send(json.dumps(ack_msg).encode())
+
 
     def shutdown(self):
         message = {"message_type": "shutdown"}
-        # send this message to all the workers
+        for worker in self.workers:
+            worker['socket'].send(json.dumps(message).encode())
+        self.shutdown = True
+
+    def handle_new_job(self):
+        pass
+
+
+    def handle_partioning(self):
+        pass
+
+
 
 
 @click.command()
