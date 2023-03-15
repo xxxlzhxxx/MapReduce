@@ -41,6 +41,7 @@ class Worker:
         self.manager_port = manager_port
         self.manager_host = manager_host
 
+        shutdown = False
         # Create a new TCP socket server
         self.tcp_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.tcp_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
@@ -49,11 +50,20 @@ class Worker:
         tcp_thread.join()
 
 
-        # create UDP socket
-        self.udp_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        self.udp_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        self.udp_socket.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
-        self.udp_socket.bind((self.worker_host, self.worker_port))
+        # create UDP client
+        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
+            # Connect to the UDP socket on server
+            sock.connect((manager_host, manager_port))
+
+            # Send heatbeat
+            message = json.dumps({
+                "message_type": "heartbeat",
+                "worker_host": host,
+                "worker_port": port
+            })
+            while not shutdown:
+                sock.sendall(message.encode('utf-8'))
+                time.sleep(2)
 
         # connect to Manager
         self.tcp_socket.connect((self.manager_host, self.manager_port))
