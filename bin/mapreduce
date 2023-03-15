@@ -18,7 +18,7 @@ mapreduce-worker --host localhost --port 6002 --manager-host localhost --manager
 
 fi
 
-if [ $1 -eq "" ]
+if [ $1 -eq "stop" ]
 then
 set +o pipefail  # Avoid erroneous failures due to grep returning non-zero
 if nc -h 2>&1 | grep -q "\-c"; then
@@ -35,4 +35,17 @@ set -o pipefail
 
 echo '{"message_type": "shutdown"}' | $NC localhost 6000 || true
 sleep 2  # give the Manager time to receive signal and send to Workers
+fi
+
+
+if [ $1 -eq "status" ]
+then
+  # Print whether or not the Manager is running,
+  
+fi
+
+if [ $1 -eq "restart" ]
+then
+  # Restart the program
+  
 fi
