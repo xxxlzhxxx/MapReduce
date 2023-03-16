@@ -70,7 +70,6 @@ class Manager:
         with self.tcp_socket:
             self.tcp_socket.bind((self.host, self.port))
             self.tcp_socket.listen()
-
             self.tcp_socket.settimeout(1)
             
             while not self.shutdown:
@@ -80,11 +79,7 @@ class Manager:
                 except socket.timeout:
                     continue
 
-                # Socket recv() will block for a maximum of 1 second.  If you omit
-                # this, it blocks indefinitely, waiting for packets.
                 conn.settimeout(1)
-                # Receive the worker's registration message
-
                 with conn:
                     message_chunks = []
                     while True:
@@ -96,10 +91,8 @@ class Manager:
                             break
                         message_chunks.append(data)
 
-                    # Decode list-of-byte-strings to UTF8 and parse JSON data
                     message_bytes = b''.join(message_chunks)
                     message_str = message_bytes.decode("utf-8")
-
                     try:
                         message_dict = json.loads(message_str)
                     except json.JSONDecodeError:
@@ -108,11 +101,11 @@ class Manager:
                     
                     # Add the worker to the list of registered workers
                     if message_dict['message_type'] == 'register':
-                        self.register(message_dict, conn, addr)
+                        self.handle_register(message_dict, conn, addr)
                         
                     # receive shutdown message, send shut down message to every worker
                     elif message_dict['message_type'] == 'shutdown':
-                        self.shutdown()
+                        self.handle_shutdown()
                     
                     # TODO: manager handle new job
                     elif message_dict['message_type'] == 'new_manager_job':
@@ -121,7 +114,9 @@ class Manager:
                     # TODO: handle input partitioning
                     elif message_dict['message_type'] == 'new_map_task':
                         self.handle_partitioning()
- 
+
+                    elif message_dict['message_type'] == 'finished':
+                        self.handle_finished()
                 
             # handle busy waiting     
             time.sleep(0.1)
@@ -148,7 +143,7 @@ class Manager:
 
 
 
-    def register(self, message_dict, conn, addr):
+    def handle_register(self, message_dict, conn, addr):
         # handle registration
         self.workers[addr] = {
             'worker_host': message_dict['worker_host'],
@@ -169,7 +164,7 @@ class Manager:
         conn.send(json.dumps(ack_msg).encode())
 
 
-    def shutdown(self):
+    def handle_shutdown(self):
         message = {"message_type": "shutdown"}
         for worker in self.workers:
             worker['socket'].send(json.dumps(message).encode())

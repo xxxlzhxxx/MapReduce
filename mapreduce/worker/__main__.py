@@ -40,8 +40,9 @@ class Worker:
         self.host = host
         self.manager_port = manager_port
         self.manager_host = manager_host
+        self.shutdown = False
+        self.start = False
 
-        shutdown = False
         # Create a new TCP socket server
         self.tcp_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.tcp_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
@@ -51,47 +52,56 @@ class Worker:
 
 
         # create UDP client
-        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
-            # Connect to the UDP socket on server
-            sock.connect((manager_host, manager_port))
+        self.udp_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        udp_thread = threading.Thread(target=self.udp_send)
+        LOGGER.debug("IMPLEMENT ME!")
+        time.sleep(120)
 
+
+    def udp_send(self):
+        """Use UDP to send heartbeat every two second."""
+
+        with self.udp_socket:
+            # Connect to the UDP socket on server
+            self.udp_socket.connect((self.manager_host, self.manager_port))
             # Send heatbeat
             message = json.dumps({
                 "message_type": "heartbeat",
-                "worker_host": host,
-                "worker_port": port
+                "worker_host": self.host,
+                "worker_port": self.port
             })
-            while not shutdown:
-                sock.sendall(message.encode('utf-8'))
+            while not self.shutdown and self.start:
+                self.udp_socket.sendall(message.encode('utf-8'))
                 time.sleep(2)
-        
-        LOGGER.debug("IMPLEMENT ME!")
-        time.sleep(120)
 
 
 
     def tcp_server(self):
         """create an infinite loop to listen."""
+
         with self.tcp_socket:
-            self.tcp_socket.connect((self.manager_host, self.manager_port))
-
-
             self.tcp_socket.bind((self.host, self.port))
-            self.tcp_socket.listen()
+            
+            # send registration message
+            message = {
+                'message_type': 'register',
+                'worker_host': self.host,
+                'worker_port': self.port
+            }
+            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+                s.connect((self.manager_host, self.manager_port))
+                s.sendall(json.dumps(message).encode('utf-8'))
 
+
+
+            self.tcp_socket.settimeout(1)
             while not self.shutdown:
-                # Wait for a connection for 1s.  The socket library avoids consuming
-                # CPU while waiting for a connection
                 try:
                     conn, addr = self.tcp_socket.accept()
                 except socket.timeout:
                     continue
 
-                # Socket recv() will block for a maximum of 1 second.  If you omit
-                # this, it blocks indefinitely, waiting for packets.
                 conn.settimeout(1)
-                # Receive the worker's registration message
-
                 with conn:
                     message_chunks = []
                     while True:
@@ -111,7 +121,12 @@ class Worker:
                         message_dict = json.loads(message_str)
                     except json.JSONDecodeError:
                         continue
-                    
+
+                    if message_dict["message_type"] == "shutdown":
+                        self.shutdown = True
+                        
+                    elif message_dict['message_type'] == 'register_ack':
+                        self.start = True
 
                 
             # handle busy waiting     
