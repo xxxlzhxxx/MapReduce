@@ -41,7 +41,6 @@ class Manager:
         self.port = port
         self.host = host
         self.workers = {}
-        self.worder_thread = []
         self.shutdown = False
 
         # Create a new TCP socket server

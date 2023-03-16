@@ -64,11 +64,7 @@ class Worker:
             while not shutdown:
                 sock.sendall(message.encode('utf-8'))
                 time.sleep(2)
-
-        # connect to Manager
-        self.tcp_socket.connect((self.manager_host, self.manager_port))
         
-
         LOGGER.debug("IMPLEMENT ME!")
         time.sleep(120)
 
