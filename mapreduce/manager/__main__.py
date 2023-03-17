@@ -130,7 +130,7 @@ class Manager:
 
             while not self.shutdown:
                 try:
-                    message_bytes = self.udp_server.recv(4096)
+                    message_bytes = self.udp_socket.recv(4096)
                 except socket.timeout:
                     continue
                 message_str = message_bytes.decode("utf-8")
@@ -147,7 +147,7 @@ class Manager:
         # handle registration
         self.workers[addr] = {
             'worker_host': message_dict['worker_host'],
-            'worker_post': message_dict['worker_port'],
+            'worker_port': message_dict['worker_port'],
             'socket': conn,
             'status': 'active',
             'tasks': [],
@@ -158,8 +158,8 @@ class Manager:
         # Send an acknowledgement back to the worker
         ack_msg = {
             "message_type": "register_ack",
-            "worker_host": self.worker['worker_host'],
-            "worker_port": self.worder['worker_port'],
+            "worker_host": self.workers[addr]['worker_host'],
+            "worker_port": self.workers[addr]['worker_port']
         }
         conn.send(json.dumps(ack_msg).encode())
 

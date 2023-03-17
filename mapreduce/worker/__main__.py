@@ -80,33 +80,25 @@ class Worker:
         """create an infinite loop to listen."""
 
         with self.tcp_socket:
+
             self.tcp_socket.bind((self.host, self.port))
-            
+            self.tcp_socket.connect((self.manager_host, self.manager_port))
             # send registration message
             message = {
                 'message_type': 'register',
                 'worker_host': self.host,
                 'worker_port': self.port
             }
-            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-                s.connect((self.manager_host, self.manager_port))
-                s.sendall(json.dumps(message).encode('utf-8'))
+            self.tcp_socket.sendall(json.dumps(message).encode('utf-8'))
 
 
-
-            self.tcp_socket.settimeout(1)
             while not self.shutdown:
-                try:
-                    conn, addr = self.tcp_socket.accept()
-                except socket.timeout:
-                    continue
-
-                conn.settimeout(1)
-                with conn:
+                self.tcp_socket.settimeout(1)
+                with self.tcp_socket:
                     message_chunks = []
                     while True:
                         try:
-                            data = conn.recv(4096)
+                            data = self.tcp_socket.recv(4096)
                         except self.tcp_socket.timeout:
                             continue
                         if not data:
