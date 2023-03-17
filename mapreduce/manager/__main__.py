@@ -78,7 +78,6 @@ class Manager:
                     conn, addr = self.tcp_socket.accept()
                 except socket.timeout:
                     continue
-
                 conn.settimeout(1)
                 with conn:
                     message_chunks = []
