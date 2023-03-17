@@ -2,7 +2,7 @@
 
 set -Eeuo pipefail
 
-if [ $1 -eq "start" ]
+if [ "$1" = "start" ]
 then
 if pgrep -f mapreduce-manager &> /dev/null
 then
@@ -26,7 +26,7 @@ mapreduce-worker --host localhost --port 6002 --manager-host localhost --manager
 
 fi
 
-if [ $1 -eq "stop" ]
+if [ "$1" = "stop" ]
 then
 set +o pipefail  # Avoid erroneous failures due to grep returning non-zero
 if nc -h 2>&1 | grep -q "\-c"; then
@@ -56,7 +56,7 @@ fi
 fi
 
 
-if [ $1 -eq "status" ]
+if [ "$1" = "status" ]
 then
   # Print whether or not the Manager is running,
   if pgrep -f mapreduce-manager &> /dev/null; then
@@ -71,7 +71,7 @@ then
   exit 1
 fi
 
-if [ $1 -eq "restart" ]
+if [ "$1" = "restart" ]
 then
   # Restart the program
   ./bin/mapreduce stop
