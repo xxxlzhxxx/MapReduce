@@ -97,7 +97,7 @@ class Manager:
                     except json.JSONDecodeError:
                         continue
                     
-                    
+                    print(message_dict)
                     # Add the worker to the list of registered workers
                     if message_dict['message_type'] == 'register':
                         self.handle_register(message_dict, conn, addr)

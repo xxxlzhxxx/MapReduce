@@ -80,8 +80,7 @@ class Worker:
         """create an infinite loop to listen."""
 
         with self.tcp_socket:
-
-            self.tcp_socket.bind((self.host, self.port))
+            # self.tcp_socket.bind((self.host, self.port))
             self.tcp_socket.connect((self.manager_host, self.manager_port))
             # send registration message
             message = {
@@ -91,38 +90,21 @@ class Worker:
             }
             self.tcp_socket.sendall(json.dumps(message).encode('utf-8'))
 
-
             while not self.shutdown:
-                self.tcp_socket.settimeout(1)
-                with self.tcp_socket:
-                    message_chunks = []
-                    while True:
-                        try:
-                            data = self.tcp_socket.recv(4096)
-                        except self.tcp_socket.timeout:
-                            continue
-                        if not data:
-                            break
-                        message_chunks.append(data)
-
-                    # Decode list-of-byte-strings to UTF8 and parse JSON data
-                    message_bytes = b''.join(message_chunks)
-                    message_str = message_bytes.decode("utf-8")
-
+                message_chunks = []
+                while True:
                     try:
-                        message_dict = json.loads(message_str)
-                    except json.JSONDecodeError:
+                        data = self.tcp_socket.recv(4096)
+                    except socket.timeout:
                         continue
-
-                    if message_dict["message_type"] == "shutdown":
-                        self.shutdown = True
-                        
-                    elif message_dict['message_type'] == 'register_ack':
-                        self.start = True
-
+                    if not data:
+                        break
+                    message_chunks.append(data)
                 
-            # handle busy waiting     
-            time.sleep(0.1)
+
+
+            
+
 
 
 @click.command()
