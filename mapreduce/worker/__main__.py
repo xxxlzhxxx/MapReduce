@@ -44,7 +44,7 @@ class Worker:
         self.tcp_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.tcp_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
  
-        self.register()
+        #self.register()
         tcp_thread = threading.Thread(target=self.tcp_server)
         tcp_thread.start()
         tcp_thread.join()
@@ -80,37 +80,50 @@ class Worker:
             self.tcp_socket.bind((self.host, self.port))
             self.tcp_socket.listen()
             self.tcp_socket.settimeout(1)
-       
+            
+            self.register()
             while not self.shutdown:
-                with self.tcp_socket:
+                try:
+                    conn, addr = self.tcp_socket.accept()
+                except socket.timeout:
+
+                    continue
+                conn.settimeout(1)
+                with conn:
                     message_chunks = []
                     while True:
                         try:
-                            data = self.tcp_socket.recv(4096)
+                            data = conn.recv(4096)
                         except socket.timeout:
                             continue
                         if not data:
                             break
                         message_chunks.append(data)
 
-                    # Decode list-of-byte-strings to UTF8 and parse JSON data
+
                     message_bytes = b''.join(message_chunks)
                     message_str = message_bytes.decode("utf-8")
-
                     try:
                         message_dict = json.loads(message_str)
                     except json.JSONDecodeError:
                         continue
 
-                    print(message_dict)
-                    if message_dict["message_type"] == 'shutdown':
-                        self.shutdown = True
-
-                    elif message_dict['message_type'] == 'register_ack':
+       
+                    # Add the worker to the list of registered workers
+                    if message_dict['message_type'] == 'register_ack':
                         self.start = True
+                        print('start heartbeat')
+                        
+                        
+                    # receive shutdown message, send shut down message to every worker
+                    elif message_dict['message_type'] == 'shutdown':
+                        self.shutdown = True
+                        print('shutting down...')
 
-                # handle busy waiting
-                time.sleep(0.1)
+
+                
+            # handle busy waiting     
+            time.sleep(0.1)
 
 
     def register(self):
@@ -123,28 +136,7 @@ class Worker:
                 'worker_port': self.port
             }
             sock.sendall(json.dumps(message).encode('utf-8'))
-"""            
-            message_chunks = []
-            while True:
-                try:
-                    data = sock.recv(4096)
-                except socket.timeout:
-                    continue
-                if not data:
-                    break
-                message_chunks.append(data)
 
-
-            message_bytes = b''.join(message_chunks)
-            message_str = message_bytes.decode("utf-8")
-            try:
-                message_dict = json.loads(message_str)
-            except json.JSONDecodeError:
-                pass
-
-
-            print(message_dict)
-"""
 
 @click.command()
 @click.option("--host", "host", default="localhost")

@@ -40,7 +40,7 @@ class Manager:
         # create an array to store all the info of workers
         self.port = port
         self.host = host
-        self.workers = {}
+        self.workers = []
         self.shutdown = False
 
         # Create a new TCP socket server
@@ -100,11 +100,10 @@ class Manager:
 
        
                     print(message_dict)
-               
+                
                     # Add the worker to the list of registered workers
                     if message_dict['message_type'] == 'register':
-                        print('register')
-                        self.handle_register(message_dict, conn, addr)
+                        self.handle_register(message_dict, addr)
                         
                     # receive shutdown message, send shut down message to every worker
                     elif message_dict['message_type'] == 'shutdown':
@@ -121,7 +120,8 @@ class Manager:
                     elif message_dict['message_type'] == 'finished':
                         self.handle_finished()
 
-                
+
+       
             # handle busy waiting     
             time.sleep(0.1)
 
@@ -147,33 +147,38 @@ class Manager:
 
 
 
-    def handle_register(self, message_dict, conn, addr):
+    def handle_register(self, message_dict, addr):
         # handle registration
         print('handle register')
-        self.workers[addr] = {
+        self.workers.append ({
             'worker_host': message_dict['worker_host'],
             'worker_port': message_dict['worker_port'],
-            'socket': conn,
             'status': 'active',
             'tasks': [],
             'last_heartbeat': time.time(),
             'num_completed_tasks': 0
-        }
+        })
 
         # Send an acknowledgement back to the worker
+        # time.sleep(1)
         ack_msg = {
             "message_type": "register_ack",
-            "worker_host": self.workers[addr]['worker_host'],
-            "worker_port": self.workers[addr]['worker_port']
+            "worker_host": message_dict['worker_host'],
+            "worker_port": message_dict['worker_port']
         }
-        conn.send(json.dumps(ack_msg).encode())
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+            sock.connect((message_dict['worker_host'], message_dict['worker_port']))
+            sock.sendall(json.dumps(ack_msg).encode('utf-8'))
+
 
 
     def handle_shutdown(self):
-        
         message = {'message_type': 'shutdown'}
         for worker in self.workers:
-            worker['socket'].send(json.dumps(message).encode())
+            print(worker)
+            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+                sock.connect((worker['worker_host'], worker['worker_port']))
+                sock.sendall(json.dumps(message).encode('utf-8'))
         self.shutdown = True
 
     def handle_new_job(self):
