@@ -48,9 +48,7 @@ class Manager:
         self.job_num = 0
 
 
-        # Create a new TCP socket server
-        self.tcp_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        self.tcp_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        
         tcp_thread = threading.Thread(target=self.tcp_server)
         tcp_thread.start()
        
@@ -62,7 +60,7 @@ class Manager:
         udp_thread = threading.Thread(target=self.udp_server)
         # udp_thread.start()
     
-        tcp_thread.join()
+        # tcp_thread.join()
         
 
         #   Note: only one listen() thread should remain open for the whole lifetime of the Manager.
@@ -73,7 +71,9 @@ class Manager:
 
     def tcp_server(self):
         """create an infinite loop to listen."""
-        with self.tcp_socket:
+        # Create a new TCP socket server 
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as self.tcp_socket:
+            self.tcp_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
             self.tcp_socket.bind((self.host, self.port))
             self.tcp_socket.listen()
             self.tcp_socket.settimeout(1)
