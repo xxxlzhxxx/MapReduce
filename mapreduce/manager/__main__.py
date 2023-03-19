@@ -9,7 +9,7 @@ import pathlib
 import mapreduce.utils
 import threading
 import socket
-import string
+import collections
 
 
 # Configure logging
@@ -42,13 +42,18 @@ class Manager:
         self.host = host
         self.workers = []
         self.shutdown = False
+        self.workers = []
+        self.job_queue = collections.deque()
+        self.task_queue = collections.deque()
+        self.job_num = 0
+
 
         # Create a new TCP socket server
         self.tcp_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.tcp_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         tcp_thread = threading.Thread(target=self.tcp_server)
         tcp_thread.start()
-        tcp_thread.join()
+       
         
         
         # Create a new UDP socket server
@@ -56,8 +61,9 @@ class Manager:
         self.udp_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         udp_thread = threading.Thread(target=self.udp_server)
         udp_thread.start()
-        udp_thread.join()
-
+    
+        tcp_thread.join()
+   
 
         #   Note: only one listen() thread should remain open for the whole lifetime of the Manager.
         LOGGER.debug("IMPLEMENT ME!")
@@ -76,7 +82,6 @@ class Manager:
                 try:
                     conn, addr = self.tcp_socket.accept()
                 except socket.timeout:
-
                     continue
                 conn.settimeout(1)
                 with conn:
@@ -103,7 +108,7 @@ class Manager:
                 
                     # Add the worker to the list of registered workers
                     if message_dict['message_type'] == 'register':
-                        self.handle_register(message_dict, addr)
+                        self.handle_register(message_dict)
                         
                     # receive shutdown message, send shut down message to every worker
                     elif message_dict['message_type'] == 'shutdown':
@@ -111,7 +116,7 @@ class Manager:
                     
                     # TODO: manager handle new job
                     elif message_dict['message_type'] == 'new_manager_job':
-                        self.handle_new_job()
+                        self.handle_new_job(message_dict)
 
                     # TODO: handle input partitioning
                     elif message_dict['message_type'] == 'new_map_task':
@@ -128,11 +133,10 @@ class Manager:
         
 
     def udp_server(self):
-        with self.udp_socket:
-            self.udp_socket.bind((self.host, self.port))
-            self.udp_socket.settimeout(1)
-
-            while not self.shutdown:
+        while not self.shutdown:
+            with self.udp_socket:
+                self.udp_socket.bind((self.host, self.port))
+                self.udp_socket.settimeout(1)
                 try:
                     message_bytes = self.udp_socket.recv(4096)
                 except socket.timeout:
@@ -147,9 +151,8 @@ class Manager:
 
 
 
-    def handle_register(self, message_dict, addr):
+    def handle_register(self, message_dict):
         # handle registration
-        print('handle register')
         self.workers.append ({
             'worker_host': message_dict['worker_host'],
             'worker_port': message_dict['worker_port'],
@@ -184,8 +187,19 @@ class Manager:
         self.shutdown = True
         print('shuting down manager...')
 
-    def handle_new_job(self):
-        pass
+
+    def handle_new_job(self, message_dict):
+        job = {
+            'job_id' : self.job_num,
+            'input_directory' : message_dict['input_directory'],
+            'output_directory': message_dict['output_directory'],
+            'mapper_executable': message_dict['mapper_executable'],
+            'reducer_executable': message_dict['reducer_executable'],
+            'num_mappers': message_dict['num_mappers'],
+            'num_reducers': message_dict['num_reducers']
+        }
+        self.job_queue.append(job)
+        self.job_num += 1
 
 
     def handle_partioning(self):

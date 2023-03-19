@@ -6,6 +6,7 @@ import time
 import click
 import mapreduce.utils
 import socket
+import collections
 import threading
 
 # Configure logging
@@ -33,6 +34,12 @@ class Worker:
         }
         LOGGER.debug("TCP recv\n%s", json.dumps(message_dict, indent=2))
 
+
+
+
+
+
+
         self.port = port
         self.host = host
         self.manager_port = manager_port
@@ -44,15 +51,18 @@ class Worker:
         self.tcp_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.tcp_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
  
+        print('before')
         #self.register()
         tcp_thread = threading.Thread(target=self.tcp_server)
         tcp_thread.start()
-        tcp_thread.join()
+       
 
-
+        print('after')
         # create UDP client
-        # self.udp_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        # udp_thread = threading.Thread(target=self.udp_send)
+        self.udp_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        udp_thread = threading.Thread(target=self.udp_send)
+        udp_thread.start()
+
         LOGGER.debug("IMPLEMENT ME!")
         time.sleep(120)
 
@@ -72,6 +82,8 @@ class Worker:
             while not self.shutdown and self.start:
                 self.udp_socket.sendall(message.encode('utf-8'))
                 time.sleep(2)
+
+
 
     def tcp_server(self):
         """create an infinite loop to listen."""
