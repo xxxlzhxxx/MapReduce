@@ -170,16 +170,19 @@ class Manager:
             sock.connect((message_dict['worker_host'], message_dict['worker_port']))
             sock.sendall(json.dumps(ack_msg).encode('utf-8'))
 
+    def assigning_work(self):
+        pass
+
 
 
     def handle_shutdown(self):
         message = {'message_type': 'shutdown'}
         for worker in self.workers:
-            print(worker)
             with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
                 sock.connect((worker['worker_host'], worker['worker_port']))
                 sock.sendall(json.dumps(message).encode('utf-8'))
         self.shutdown = True
+        print('shuting down manager...')
 
     def handle_new_job(self):
         pass

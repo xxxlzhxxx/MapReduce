@@ -51,8 +51,8 @@ class Worker:
 
 
         # create UDP client
-        self.udp_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        udp_thread = threading.Thread(target=self.udp_send)
+        # self.udp_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        # udp_thread = threading.Thread(target=self.udp_send)
         LOGGER.debug("IMPLEMENT ME!")
         time.sleep(120)
 
@@ -118,7 +118,7 @@ class Worker:
                     # receive shutdown message, send shut down message to every worker
                     elif message_dict['message_type'] == 'shutdown':
                         self.shutdown = True
-                        print('shutting down...')
+                        print('shutting down worker...')
 
 
                 
