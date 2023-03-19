@@ -35,11 +35,6 @@ class Worker:
         LOGGER.debug("TCP recv\n%s", json.dumps(message_dict, indent=2))
 
 
-
-
-
-
-
         self.port = port
         self.host = host
         self.manager_port = manager_port
@@ -51,20 +46,23 @@ class Worker:
         self.tcp_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.tcp_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
  
-        print('before')
+     
         #self.register()
         tcp_thread = threading.Thread(target=self.tcp_server)
         tcp_thread.start()
        
 
-        print('after')
         # create UDP client
         self.udp_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         udp_thread = threading.Thread(target=self.udp_send)
         udp_thread.start()
 
-        LOGGER.debug("IMPLEMENT ME!")
-        time.sleep(120)
+
+        tcp_thread.join()
+        udp_thread.join()  
+
+        # LOGGER.debug("IMPLEMENT ME!")
+        # time.sleep(120)
 
 
     def udp_send(self):

@@ -60,14 +60,14 @@ class Manager:
         self.udp_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self.udp_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         udp_thread = threading.Thread(target=self.udp_server)
-        udp_thread.start()
+        # udp_thread.start()
     
         tcp_thread.join()
-   
+        
 
         #   Note: only one listen() thread should remain open for the whole lifetime of the Manager.
-        LOGGER.debug("IMPLEMENT ME!")
-        time.sleep(120)
+        # LOGGER.debug("IMPLEMENT ME!")
+        # time.sleep(120)
 
 
 
