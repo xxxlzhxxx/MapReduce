@@ -33,9 +33,6 @@ class Worker:
         }
         LOGGER.debug("TCP recv\n%s", json.dumps(message_dict, indent=2))
 
-        # TODO: you should remove this. This is just so the program doesn't
-        # exit immediately!
-
         self.port = port
         self.host = host
         self.manager_port = manager_port
@@ -74,8 +71,6 @@ class Worker:
                 self.udp_socket.sendall(message.encode('utf-8'))
                 time.sleep(2)
 
-
-
     def tcp_server(self):
         """create an infinite loop to listen."""
 
@@ -91,19 +86,36 @@ class Worker:
             self.tcp_socket.sendall(json.dumps(message).encode('utf-8'))
 
             while not self.shutdown:
-                message_chunks = []
-                while True:
+                self.tcp_socket.settimeout(1)
+                with self.tcp_socket:
+                    message_chunks = []
+                    while True:
+                        try:
+                            data = self.tcp_socket.recv(4096)
+                        except socket.timeout:
+                            continue
+                        if not data:
+                            break
+                        message_chunks.append(data)
+
+                    # Decode list-of-byte-strings to UTF8 and parse JSON data
+                    message_bytes = b''.join(message_chunks)
+                    message_str = message_bytes.decode("utf-8")
+
                     try:
-                        data = self.tcp_socket.recv(4096)
-                    except socket.timeout:
+                        message_dict = json.loads(message_str)
+                    except json.JSONDecodeError:
                         continue
-                    if not data:
-                        break
-                    message_chunks.append(data)
-                
 
+                    if message_dict["message_type"] == "shutdown":
+                        self.shutdown = True
 
-            
+                    elif message_dict['message_type'] == 'register_ack':
+                        self.start = True
+
+                # handle busy waiting
+                time.sleep(0.1)
+
 
 
 

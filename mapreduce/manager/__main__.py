@@ -71,7 +71,6 @@ class Manager:
             self.tcp_socket.bind((self.host, self.port))
             self.tcp_socket.listen()
             self.tcp_socket.settimeout(1)
-            
             while not self.shutdown:
                 # Accept a connection from a worker
                 try:
@@ -84,7 +83,7 @@ class Manager:
                     while True:
                         try:
                             data = conn.recv(4096)
-                        except self.tcp_socket.timeout:
+                        except socket.timeout:
                             continue
                         if not data:
                             break
@@ -97,7 +96,6 @@ class Manager:
                     except json.JSONDecodeError:
                         continue
                     
-                    print(message_dict)
                     # Add the worker to the list of registered workers
                     if message_dict['message_type'] == 'register':
                         self.handle_register(message_dict, conn, addr)
