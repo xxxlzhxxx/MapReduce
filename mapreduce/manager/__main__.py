@@ -76,6 +76,7 @@ class Manager:
                 try:
                     conn, addr = self.tcp_socket.accept()
                 except socket.timeout:
+
                     continue
                 conn.settimeout(1)
                 with conn:
@@ -89,15 +90,20 @@ class Manager:
                             break
                         message_chunks.append(data)
 
+
                     message_bytes = b''.join(message_chunks)
                     message_str = message_bytes.decode("utf-8")
                     try:
                         message_dict = json.loads(message_str)
                     except json.JSONDecodeError:
                         continue
-                    
+
+       
+                    print(message_dict)
+               
                     # Add the worker to the list of registered workers
                     if message_dict['message_type'] == 'register':
+                        print('register')
                         self.handle_register(message_dict, conn, addr)
                         
                     # receive shutdown message, send shut down message to every worker
@@ -114,6 +120,7 @@ class Manager:
 
                     elif message_dict['message_type'] == 'finished':
                         self.handle_finished()
+
                 
             # handle busy waiting     
             time.sleep(0.1)
@@ -142,6 +149,7 @@ class Manager:
 
     def handle_register(self, message_dict, conn, addr):
         # handle registration
+        print('handle register')
         self.workers[addr] = {
             'worker_host': message_dict['worker_host'],
             'worker_port': message_dict['worker_port'],
@@ -162,7 +170,8 @@ class Manager:
 
 
     def handle_shutdown(self):
-        message = {"message_type": "shutdown"}
+        
+        message = {'message_type': 'shutdown'}
         for worker in self.workers:
             worker['socket'].send(json.dumps(message).encode())
         self.shutdown = True

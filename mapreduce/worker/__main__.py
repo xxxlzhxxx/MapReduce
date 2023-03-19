@@ -43,6 +43,8 @@ class Worker:
         # Create a new TCP socket server
         self.tcp_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.tcp_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+ 
+        self.register()
         tcp_thread = threading.Thread(target=self.tcp_server)
         tcp_thread.start()
         tcp_thread.join()
@@ -75,18 +77,11 @@ class Worker:
         """create an infinite loop to listen."""
 
         with self.tcp_socket:
-            # self.tcp_socket.bind((self.host, self.port))
-            self.tcp_socket.connect((self.manager_host, self.manager_port))
-            # send registration message
-            message = {
-                'message_type': 'register',
-                'worker_host': self.host,
-                'worker_port': self.port
-            }
-            self.tcp_socket.sendall(json.dumps(message).encode('utf-8'))
-
+            self.tcp_socket.bind((self.host, self.port))
+            self.tcp_socket.listen()
+            self.tcp_socket.settimeout(1)
+       
             while not self.shutdown:
-                self.tcp_socket.settimeout(1)
                 with self.tcp_socket:
                     message_chunks = []
                     while True:
@@ -107,7 +102,8 @@ class Worker:
                     except json.JSONDecodeError:
                         continue
 
-                    if message_dict["message_type"] == "shutdown":
+                    print(message_dict)
+                    if message_dict["message_type"] == 'shutdown':
                         self.shutdown = True
 
                     elif message_dict['message_type'] == 'register_ack':
@@ -117,7 +113,38 @@ class Worker:
                 time.sleep(0.1)
 
 
+    def register(self):
+        """Send registration message to the manager."""
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+            sock.connect((self.manager_host, self.manager_port))
+            message = {
+                'message_type': 'register',
+                'worker_host': self.host,
+                'worker_port': self.port
+            }
+            sock.sendall(json.dumps(message).encode('utf-8'))
+"""            
+            message_chunks = []
+            while True:
+                try:
+                    data = sock.recv(4096)
+                except socket.timeout:
+                    continue
+                if not data:
+                    break
+                message_chunks.append(data)
 
+
+            message_bytes = b''.join(message_chunks)
+            message_str = message_bytes.decode("utf-8")
+            try:
+                message_dict = json.loads(message_str)
+            except json.JSONDecodeError:
+                pass
+
+
+            print(message_dict)
+"""
 
 @click.command()
 @click.option("--host", "host", default="localhost")
