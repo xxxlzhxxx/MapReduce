@@ -10,7 +10,7 @@ import mapreduce.utils
 import threading
 import socket
 import collections
-
+import tempfile
 
 # Configure logging
 LOGGER = logging.getLogger(__name__)
@@ -45,14 +45,18 @@ class Manager:
         self.job_queue = collections.deque()
         self.task_queue = collections.deque()
         self.job_num = 0
+        self.running = False
 
         tcp_thread = threading.Thread(target=self.tcp_server)
         tcp_thread.start()
         udp_thread = threading.Thread(target=self.udp_server)
         udp_thread.start()
+        job_thread = threading.Thread(target=self.run_job)
+        job_thread.start()
 
         tcp_thread.join()
         udp_thread.join()
+        job_thread.join()
 
         #   Note: only one listen() thread should remain open for the whole lifetime of the Manager.
         # LOGGER.debug("IMPLEMENT ME!")
@@ -112,7 +116,7 @@ class Manager:
 
                     elif message_dict['message_type'] == 'finished':
                         self.handle_finished()
-
+            
             # handle busy waiting
             time.sleep(0.1)
 
@@ -184,6 +188,21 @@ class Manager:
         }
         self.job_queue.append(job)
         self.job_num += 1
+
+    def run_job(self):
+        while not self.shutdown:
+            finished = False
+            if self.job_queue:
+                job = self.job_queue.pop()
+                prefix = f"mapreduce-shared-job{job['job_id']:05d}-"
+                with tempfile.TemporaryDirectory(prefix=prefix) as tmpdir:
+                    LOGGER.info("Created tmpdir %s", tmpdir)
+                    while not finished and not self.shutdown:
+                        time.sleep(0.1)
+
+            LOGGER.info("Cleaned up tmpdir %s", tmpdir)
+            time.sleep(0.1)
+
 
     def handle_partioning(self):
         pass
