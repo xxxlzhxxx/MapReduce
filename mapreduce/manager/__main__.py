@@ -194,13 +194,19 @@ class Manager:
             finished = False
             if self.job_queue:
                 job = self.job_queue.pop()
+
+                outdir = job['output_directory']
+                if os.path.exists(outdir):
+                    os.rmdir(outdir)
+                os.mkdir(outdir)
+                print("output made")
                 prefix = f"mapreduce-shared-job{job['job_id']:05d}-"
                 with tempfile.TemporaryDirectory(prefix=prefix) as tmpdir:
                     LOGGER.info("Created tmpdir %s", tmpdir)
                     while not finished and not self.shutdown:
                         time.sleep(0.1)
 
-            LOGGER.info("Cleaned up tmpdir %s", tmpdir)
+                LOGGER.info("Cleaned up tmpdir %s", tmpdir)
             time.sleep(0.1)
 
 
