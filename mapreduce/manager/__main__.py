@@ -57,10 +57,10 @@ class Manager:
         # Create a new UDP socket server
         self.udp_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self.udp_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        udp_thread = threading.Thread(target=self.udp_server)
+        # udp_thread = threading.Thread(target=self.udp_server)
         # udp_thread.start()
     
-        # tcp_thread.join()
+        tcp_thread.join()
         
 
         #   Note: only one listen() thread should remain open for the whole lifetime of the Manager.

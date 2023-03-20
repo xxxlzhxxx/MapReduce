@@ -43,8 +43,8 @@ class Worker:
         self.start = False
 
         # Create a new TCP socket server
-        self.tcp_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        self.tcp_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        
+        
  
      
         #self.register()
@@ -53,13 +53,13 @@ class Worker:
        
 
         # create UDP client
-        self.udp_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        udp_thread = threading.Thread(target=self.udp_send)
-        udp_thread.start()
+        # self.udp_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        # udp_thread = threading.Thread(target=self.udp_send)
+        # udp_thread.start()
 
 
         tcp_thread.join()
-        udp_thread.join()  
+        # udp_thread.join()  
 
         # LOGGER.debug("IMPLEMENT ME!")
         # time.sleep(120)
@@ -68,7 +68,7 @@ class Worker:
     def udp_send(self):
         """Use UDP to send heartbeat every two second."""
 
-        with self.udp_socket:
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as  self.tcp_socket:
             # Connect to the UDP socket on server
             self.udp_socket.connect((self.manager_host, self.manager_port))
             # Send heatbeat
@@ -85,8 +85,8 @@ class Worker:
 
     def tcp_server(self):
         """create an infinite loop to listen."""
-
-        with self.tcp_socket:
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as self.tcp_socket:
+            self.tcp_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
             self.tcp_socket.bind((self.host, self.port))
             self.tcp_socket.listen()
             self.tcp_socket.settimeout(1)
