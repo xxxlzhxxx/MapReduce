@@ -39,7 +39,6 @@ class Manager:
         # create an array to store all the info of workers
         self.port = port
         self.host = host
-        self.workers = []
         self.shutdown = False
         self.workers = {}
         self.job_queue = collections.deque()
@@ -116,7 +115,7 @@ class Manager:
 
                     elif message_dict['message_type'] == 'finished':
                         self.handle_finished()
-            
+
             # handle busy waiting
             time.sleep(0.1)
 
@@ -124,9 +123,11 @@ class Manager:
         with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as self.udp_socket:
             self.udp_socket.setsockopt(
                 socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+            self.udp_socket.bind((self.host, self.port))
+            self.udp_socket.settimeout(1)
+
+            
             while not self.shutdown:
-                self.udp_socket.bind((self.host, self.port))
-                self.udp_socket.settimeout(1)
                 try:
                     message_bytes = self.udp_socket.recv(4096)
                 except socket.timeout:
@@ -169,9 +170,11 @@ class Manager:
 
     def handle_shutdown(self):
         message = {'message_type': 'shutdown'}
-        for worker in self.workers:
+        for key in self.workers:
+            print(key)
             with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
-                sock.connect((worker['worker_host'], worker['worker_port']))
+                sock.connect(
+                    (self.workers[key]['worker_host'], self.workers[key]['worker_port']))
                 sock.sendall(json.dumps(message).encode('utf-8'))
         self.shutdown = True
         print('shuting down manager...')
@@ -208,7 +211,6 @@ class Manager:
 
                 LOGGER.info("Cleaned up tmpdir %s", tmpdir)
             time.sleep(0.1)
-
 
     def handle_partioning(self):
         pass
