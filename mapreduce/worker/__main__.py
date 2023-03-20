@@ -15,6 +15,7 @@ LOGGER = logging.getLogger(__name__)
 
 class Worker:
     """A class representing a Worker node in a MapReduce cluster."""
+
     def __init__(self, host, port, manager_host, manager_port):
         """Construct a Worker instance and start listening for messages."""
         LOGGER.info(
@@ -34,7 +35,6 @@ class Worker:
         }
         LOGGER.debug("TCP recv\n%s", json.dumps(message_dict, indent=2))
 
-
         self.port = port
         self.host = host
         self.manager_port = manager_port
@@ -43,32 +43,24 @@ class Worker:
         self.start = False
 
         # Create a new TCP socket server
-        
-        
- 
-     
-        #self.register()
+
+
         tcp_thread = threading.Thread(target=self.tcp_server)
         tcp_thread.start()
-       
 
-        # create UDP client
-        # self.udp_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        # udp_thread = threading.Thread(target=self.udp_send)
-        # udp_thread.start()
-
+        udp_thread = threading.Thread(target=self.udp_send)
+        udp_thread.start()
 
         tcp_thread.join()
-        # udp_thread.join()  
+        udp_thread.join()
 
         # LOGGER.debug("IMPLEMENT ME!")
         # time.sleep(120)
 
-
     def udp_send(self):
         """Use UDP to send heartbeat every two second."""
 
-        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as  self.tcp_socket:
+        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as self.udp_socket:
             # Connect to the UDP socket on server
             self.udp_socket.connect((self.manager_host, self.manager_port))
             # Send heatbeat
@@ -81,16 +73,15 @@ class Worker:
                 self.udp_socket.sendall(message.encode('utf-8'))
                 time.sleep(2)
 
-
-
     def tcp_server(self):
         """create an infinite loop to listen."""
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as self.tcp_socket:
-            self.tcp_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+            self.tcp_socket.setsockopt(
+                socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
             self.tcp_socket.bind((self.host, self.port))
             self.tcp_socket.listen()
             self.tcp_socket.settimeout(1)
-            
+
             self.register()
             while not self.shutdown:
                 try:
@@ -110,7 +101,6 @@ class Worker:
                             break
                         message_chunks.append(data)
 
-
                     message_bytes = b''.join(message_chunks)
                     message_str = message_bytes.decode("utf-8")
                     try:
@@ -118,23 +108,18 @@ class Worker:
                     except json.JSONDecodeError:
                         continue
 
-       
                     # Add the worker to the list of registered workers
                     if message_dict['message_type'] == 'register_ack':
                         self.start = True
                         print('start heartbeat')
-                        
-                        
+
                     # receive shutdown message, send shut down message to every worker
                     elif message_dict['message_type'] == 'shutdown':
                         self.shutdown = True
                         print('shutting down worker...')
 
-
-                
-            # handle busy waiting     
+            # handle busy waiting
             time.sleep(0.1)
-
 
     def register(self):
         """Send registration message to the manager."""

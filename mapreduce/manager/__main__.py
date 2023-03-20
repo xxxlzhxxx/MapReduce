@@ -35,8 +35,7 @@ class Manager:
         }
         LOGGER.debug("TCP recv\n%s", json.dumps(message_dict, indent=2))
 
-
-        # begin --------------------------------------------------------------------------------
+        # begin ---------------------------------------------------------
         # create an array to store all the info of workers
         self.port = port
         self.host = host
@@ -47,33 +46,24 @@ class Manager:
         self.task_queue = collections.deque()
         self.job_num = 0
 
-
-        
         tcp_thread = threading.Thread(target=self.tcp_server)
         tcp_thread.start()
-       
-        
-        
-        # Create a new UDP socket server
-        self.udp_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        self.udp_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        # udp_thread = threading.Thread(target=self.udp_server)
-        # udp_thread.start()
-    
+        udp_thread = threading.Thread(target=self.udp_server)
+        udp_thread.start()
+
         tcp_thread.join()
-        
+        udp_thread.join()
 
         #   Note: only one listen() thread should remain open for the whole lifetime of the Manager.
         # LOGGER.debug("IMPLEMENT ME!")
         # time.sleep(120)
 
-
-
     def tcp_server(self):
         """create an infinite loop to listen."""
-        # Create a new TCP socket server 
+        # Create a new TCP socket server
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as self.tcp_socket:
-            self.tcp_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+            self.tcp_socket.setsockopt(
+                socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
             self.tcp_socket.bind((self.host, self.port))
             self.tcp_socket.listen()
             self.tcp_socket.settimeout(1)
@@ -95,7 +85,6 @@ class Manager:
                             break
                         message_chunks.append(data)
 
-
                     message_bytes = b''.join(message_chunks)
                     message_str = message_bytes.decode("utf-8")
                     try:
@@ -103,17 +92,16 @@ class Manager:
                     except json.JSONDecodeError:
                         continue
 
-       
                     print(message_dict)
-                
+
                     # Add the worker to the list of registered workers
                     if message_dict['message_type'] == 'register':
                         self.handle_register(message_dict)
-                        
+
                     # receive shutdown message, send shut down message to every worker
                     elif message_dict['message_type'] == 'shutdown':
                         self.handle_shutdown()
-                    
+
                     # TODO: manager handle new job
                     elif message_dict['message_type'] == 'new_manager_job':
                         self.handle_new_job(message_dict)
@@ -125,16 +113,14 @@ class Manager:
                     elif message_dict['message_type'] == 'finished':
                         self.handle_finished()
 
-
-       
-            # handle busy waiting     
+            # handle busy waiting
             time.sleep(0.1)
 
-        
-
     def udp_server(self):
-        while not self.shutdown:
-            with self.udp_socket:
+        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as self.udp_socket:
+            self.udp_socket.setsockopt(
+                socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+            while not self.shutdown:
                 self.udp_socket.bind((self.host, self.port))
                 self.udp_socket.settimeout(1)
                 try:
@@ -148,20 +134,9 @@ class Manager:
                 # handle busy waiting
                 time.sleep(0.1)
 
-
-
-
     def handle_register(self, message_dict):
         # handle registration
-        self.workers.append ({
-            'worker_host': message_dict['worker_host'],
-            'worker_port': message_dict['worker_port'],
-            'status': 'active',
-            'tasks': [],
-            'last_heartbeat': time.time(),
-            'num_completed_tasks': 0
-        })
-
+        status = 'active'
         # Send an acknowledgement back to the worker
         # time.sleep(1)
         ack_msg = {
@@ -170,13 +145,23 @@ class Manager:
             "worker_port": message_dict['worker_port']
         }
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
-            sock.connect((message_dict['worker_host'], message_dict['worker_port']))
-            sock.sendall(json.dumps(ack_msg).encode('utf-8'))
+            try:
+                sock.connect(
+                    (message_dict['worker_host'], message_dict['worker_port']))
+                sock.sendall(json.dumps(ack_msg).encode('utf-8'))
+            except ConnectionRefusedError:
+                status = 'dead'
+        self.workers.append({
+            'worker_host': message_dict['worker_host'],
+            'worker_port': message_dict['worker_port'],
+            'status': status,
+            'tasks': [],
+            'last_heartbeat': time.time(),
+            'num_completed_tasks': 0
+        })
 
     def assigning_work(self):
         pass
-
-
 
     def handle_shutdown(self):
         message = {'message_type': 'shutdown'}
@@ -187,11 +172,10 @@ class Manager:
         self.shutdown = True
         print('shuting down manager...')
 
-
     def handle_new_job(self, message_dict):
         job = {
-            'job_id' : self.job_num,
-            'input_directory' : message_dict['input_directory'],
+            'job_id': self.job_num,
+            'input_directory': message_dict['input_directory'],
             'output_directory': message_dict['output_directory'],
             'mapper_executable': message_dict['mapper_executable'],
             'reducer_executable': message_dict['reducer_executable'],
@@ -201,11 +185,8 @@ class Manager:
         self.job_queue.append(job)
         self.job_num += 1
 
-
     def handle_partioning(self):
         pass
-
-
 
 
 @click.command()
