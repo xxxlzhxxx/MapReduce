@@ -41,7 +41,7 @@ class Manager:
         self.host = host
         self.workers = []
         self.shutdown = False
-        self.workers = []
+        self.workers = {}
         self.job_queue = collections.deque()
         self.task_queue = collections.deque()
         self.job_num = 0
@@ -155,14 +155,14 @@ class Manager:
                 sock.sendall(json.dumps(ack_msg).encode('utf-8'))
             except ConnectionRefusedError:
                 status = 'dead'
-        self.workers.append({
+        self.workers[(message_dict['worker_host'], message_dict['worker_port'])] = {
             'worker_host': message_dict['worker_host'],
             'worker_port': message_dict['worker_port'],
             'status': status,
             'tasks': [],
             'last_heartbeat': time.time(),
             'num_completed_tasks': 0
-        })
+        }
 
     def assigning_work(self):
         pass
