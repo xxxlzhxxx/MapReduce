@@ -126,7 +126,6 @@ class Manager:
             self.udp_socket.bind((self.host, self.port))
             self.udp_socket.settimeout(1)
 
-            
             while not self.shutdown:
                 try:
                     message_bytes = self.udp_socket.recv(4096)
@@ -135,13 +134,20 @@ class Manager:
                 message_str = message_bytes.decode("utf-8")
                 message_dict = json.loads(message_str)
                 # detect whether a worker is dead
-
+                print(message_dict)
+                self.workers[(message_dict['worker_host'],
+                              message_dict['worker_port'])]['last_heartbeat'] = time.time()
+                for key in self.workers:
+                    last_time = self.workers[key]['last_heartbeat']
+                    if time.time() - last_time > 10:
+                        self.workers[key]['status'] = 'dead'
+                        print(key, "has dead")
                 # handle busy waiting
                 time.sleep(0.1)
 
     def handle_register(self, message_dict):
         # handle registration
-        status = 'active'
+        status = 'ready'
         # Send an acknowledgement back to the worker
         # time.sleep(1)
         ack_msg = {
