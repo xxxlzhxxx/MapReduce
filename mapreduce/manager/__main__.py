@@ -39,8 +39,9 @@ class Manager:
         # create an array to store all the info of workers
         self.port = port
         self.host = host
+        self.workers = []
         self.shutdown = False
-        self.workers = {}
+        self.workers = []
         self.job_queue = collections.deque()
         self.task_queue = collections.deque()
         self.job_num = 0
@@ -115,7 +116,7 @@ class Manager:
 
                     elif message_dict['message_type'] == 'finished':
                         self.handle_finished()
-
+            
             # handle busy waiting
             time.sleep(0.1)
 
@@ -123,11 +124,9 @@ class Manager:
         with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as self.udp_socket:
             self.udp_socket.setsockopt(
                 socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-            self.udp_socket.bind((self.host, self.port))
-            self.udp_socket.settimeout(1)
-
-            
             while not self.shutdown:
+                self.udp_socket.bind((self.host, self.port))
+                self.udp_socket.settimeout(1)
                 try:
                     message_bytes = self.udp_socket.recv(4096)
                 except socket.timeout:
@@ -156,25 +155,23 @@ class Manager:
                 sock.sendall(json.dumps(ack_msg).encode('utf-8'))
             except ConnectionRefusedError:
                 status = 'dead'
-        self.workers[(message_dict['worker_host'], message_dict['worker_port'])] = {
+        self.workers.append({
             'worker_host': message_dict['worker_host'],
             'worker_port': message_dict['worker_port'],
             'status': status,
             'tasks': [],
             'last_heartbeat': time.time(),
             'num_completed_tasks': 0
-        }
+        })
 
     def assigning_work(self):
         pass
 
     def handle_shutdown(self):
         message = {'message_type': 'shutdown'}
-        for key in self.workers:
-            print(key)
+        for worker in self.workers:
             with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
-                sock.connect(
-                    (self.workers[key]['worker_host'], self.workers[key]['worker_port']))
+                sock.connect((worker['worker_host'], worker['worker_port']))
                 sock.sendall(json.dumps(message).encode('utf-8'))
         self.shutdown = True
         print('shuting down manager...')
@@ -207,10 +204,47 @@ class Manager:
                 with tempfile.TemporaryDirectory(prefix=prefix) as tmpdir:
                     LOGGER.info("Created tmpdir %s", tmpdir)
                     while not finished and not self.shutdown:
+                        files = os.listdir(job['input_directory'])
+                        sorted_files = sorted(files)
+                        partitions = [[] for i in range(job['num_mappers'])]
+                        for i, file in enumerate(sorted_files):
+                            partitions[i % job['num_mappers']].append(file)
+                        for task_id, partition in enumerate(partitions):
+                            input_path = [os.path.join(job['input_directory'], filename) for filename in partition]
+                            while True:
+                                for key in self.workers:
+                                    if self.workers[key]['status'] == 'ready':
+                                        message = {
+                                            "message_type": "new_map_task",
+                                            "task_id": task_id,
+                                            "input_paths": input_path,
+                                            "executable": job['mapper_executable'],
+                                            "output_directory": tmpdir,
+                                            "num_partitions": job['num_reducers'],
+                                            "worker_host": self.workers[key]['worker_host'],
+                                            "worker_port": self.workers[key]['worker_port']
+                                        }
+                                        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+                                            try:
+                                                sock.connect(
+                                                    (self.workers[key]['worker_host'], self.workers[key]['worker_port']))
+                                                sock.sendall(json.dumps(message).encode('utf-8'))
+                                                self.workers[key]['status'] = 'busy'
+                                                self.workers[key]['tasks'] = partition
+                                            except ConnectionRefusedError:
+                                                self.workers[key]['status'] = 'dead'
+                                        break
+                                else:
+                                    time.sleep(0.1)
+                                    continue
+                                break
+                                    
+                            
                         time.sleep(0.1)
 
                 LOGGER.info("Cleaned up tmpdir %s", tmpdir)
             time.sleep(0.1)
+
 
     def handle_partioning(self):
         pass
