@@ -27,14 +27,6 @@ class Manager:
             host, port, os.getcwd(),
         )
 
-        # This is a fake message to demonstrate pretty printing with logging
-        message_dict = {
-            "message_type": "register",
-            "worker_host": "localhost",
-            "worker_port": 6001,
-        }
-        LOGGER.debug("TCP recv\n%s", json.dumps(message_dict, indent=2))
-
         # begin ---------------------------------------------------------
         # create an array to store all the info of workers
         self.port = port
@@ -135,13 +127,14 @@ class Manager:
                 message_dict = json.loads(message_str)
                 # detect whether a worker is dead
                 print(message_dict)
-                self.workers[(message_dict['worker_host'],
+                self.workers[(message_dict['worker_host'], 
                               message_dict['worker_port'])]['last_heartbeat'] = time.time()
                 for key in self.workers:
                     last_time = self.workers[key]['last_heartbeat']
                     if time.time() - last_time > 10:
                         self.workers[key]['status'] = 'dead'
                         print(key, "has dead")
+
                 # handle busy waiting
                 time.sleep(0.1)
 
@@ -218,7 +211,8 @@ class Manager:
                         for i, file in enumerate(sorted_files):
                             partitions[i % job['num_mappers']].append(file)
                         for task_id, partition in enumerate(partitions):
-                            input_path = [os.path.join(job['input_directory'], filename) for filename in partition]
+                            input_path = [os.path.join(
+                                job['input_directory'], filename) for filename in partition]
                             # print(partition)
                             assigned = False
                             while not assigned:
@@ -240,7 +234,8 @@ class Manager:
                                             try:
                                                 sock.connect(
                                                     (self.workers[key]['worker_host'], self.workers[key]['worker_port']))
-                                                sock.sendall(json.dumps(message).encode('utf-8'))
+                                                sock.sendall(json.dumps(
+                                                    message).encode('utf-8'))
                                                 self.workers[key]['status'] = 'busy'
                                                 self.workers[key]['tasks'] = task_id
                                                 assigned = True
@@ -250,7 +245,6 @@ class Manager:
                                 time.sleep(0.1)
                                 continue
                         finished = True
-                                    
 
                 LOGGER.info("Cleaned up tmpdir %s", tmpdir)
             time.sleep(0.1)
@@ -264,7 +258,6 @@ class Manager:
             if self.workers[key]['tasks'] == message_dict['task_id']:
                 self.workers[key]['status'] = 'ready'
                 self.workers[key]['tasks'] = -1
-
 
 
 @click.command()

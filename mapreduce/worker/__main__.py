@@ -68,6 +68,7 @@ class Worker:
             # Connect to the UDP socket on server
             self.udp_socket.connect((self.manager_host, self.manager_port))
             # Send heatbeat
+            print(self.host, self.port)
             message = json.dumps({
                 "message_type": "heartbeat",
                 "worker_host": self.host,
