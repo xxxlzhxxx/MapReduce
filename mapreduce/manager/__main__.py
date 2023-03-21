@@ -137,7 +137,7 @@ class Manager:
                     last_time = self.workers[key]['last_heartbeat']
                     if time.time() - last_time > 10:
                         self.workers[key]['status'] = 'dead'
-                        self.partitions.append(self.worker[key]['tasks'])
+                        self.partitions.append(self.workers[key]['tasks'])
                         print(key, "has dead")
 
                 # handle busy waiting
