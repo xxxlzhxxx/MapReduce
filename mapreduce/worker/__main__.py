@@ -59,7 +59,7 @@ class Worker:
 
     def udp_send(self):
         """Use UDP to send heartbeat every two second."""
-
+     
         with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as self.udp_socket:
             # Connect to the UDP socket on server
             self.udp_socket.connect((self.manager_host, self.manager_port))
@@ -69,7 +69,10 @@ class Worker:
                 "worker_host": self.host,
                 "worker_port": self.port
             })
-            while not self.shutdown and self.start:
+            while not self.shutdown:
+                if not self.start:
+                    time.sleep(0.5)
+                    continue
                 self.udp_socket.sendall(message.encode('utf-8'))
                 time.sleep(2)
 
@@ -111,7 +114,7 @@ class Worker:
                     # Add the worker to the list of registered workers
                     if message_dict['message_type'] == 'register_ack':
                         self.start = True
-                        print('start heartbeat')
+                        
 
                     # receive shutdown message, send shut down message to every worker
                     elif message_dict['message_type'] == 'shutdown':

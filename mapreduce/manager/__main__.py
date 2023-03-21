@@ -124,6 +124,9 @@ class Manager:
         with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as self.udp_socket:
             self.udp_socket.setsockopt(
                 socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+            self.udp_socket.bind((self.host, self.port))
+            self.udp_socket.settimeout(1)
+
             while not self.shutdown:
                 self.udp_socket.bind((self.host, self.port))
                 self.udp_socket.settimeout(1)
@@ -134,13 +137,20 @@ class Manager:
                 message_str = message_bytes.decode("utf-8")
                 message_dict = json.loads(message_str)
                 # detect whether a worker is dead
-
+                print(message_dict)
+                self.workers[(message_dict['worker_host'],
+                              message_dict['worker_port'])]['last_heartbeat'] = time.time()
+                for key in self.workers:
+                    last_time = self.workers[key]['last_heartbeat']
+                    if time.time() - last_time > 10:
+                        self.workers[key]['status'] = 'dead'
+                        print(key, "has dead")
                 # handle busy waiting
                 time.sleep(0.1)
 
     def handle_register(self, message_dict):
         # handle registration
-        status = 'active'
+        status = 'ready'
         # Send an acknowledgement back to the worker
         # time.sleep(1)
         ack_msg = {
@@ -213,7 +223,11 @@ class Manager:
                             input_path = [os.path.join(job['input_directory'], filename) for filename in partition]
                             while True:
                                 for key in self.workers:
+                                    print("000000")
+                                    print(key)
+                                    print(self.workers[key]['status'])
                                     if self.workers[key]['status'] == 'ready':
+                                        # print("self.workers[key]")
                                         message = {
                                             "message_type": "new_map_task",
                                             "task_id": task_id,
@@ -224,6 +238,8 @@ class Manager:
                                             "worker_host": self.workers[key]['worker_host'],
                                             "worker_port": self.workers[key]['worker_port']
                                         }
+                                        print("0000000")
+                                        print(message)
                                         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
                                             try:
                                                 sock.connect(
