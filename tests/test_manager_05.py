@@ -43,11 +43,13 @@ def worker_message_generator(mock_sendall, tmp_path):
     # tmpdir to simulate the Manager calling recv() when there's nothing
     # to receive.
     tmpdir_job0 = None
+    print('send jobs finished')
     for tmpdir_job0 in (
         utils.wait_for_exists_glob(f"{tmp_path}/mapreduce-shared-job00000-*")
     ):
         yield None
 
+    print('created dir')
     # Simulate files created by Worker.  The files are empty because the
     # Manager does not read the contents, just the filenames.
     (tmpdir_job0/"maptask00000-part00000").touch()
@@ -58,6 +60,7 @@ def worker_message_generator(mock_sendall, tmp_path):
     # Transfer control back to solution under test in between each check for
     # map messages to simulate the Manager calling recv() when there's nothing
     # to receive.
+    print('ok')
     for _ in utils.wait_for_map_messages(mock_sendall, num=2):
         yield None
 
