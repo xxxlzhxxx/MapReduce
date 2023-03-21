@@ -44,6 +44,7 @@ class Manager:
         self.job_queue = collections.deque()
         self.task_queue = collections.deque()
         self.job_num = 0
+        self.partitions = collections.deque()
         self.running = False
 
         tcp_thread = threading.Thread(target=self.tcp_server)
@@ -127,6 +128,7 @@ class Manager:
             self.udp_socket.settimeout(1)
 
             while not self.shutdown:
+                print(self.shutdown)
                 try:
                     message_bytes = self.udp_socket.recv(4096)
                 except socket.timeout:
@@ -141,6 +143,7 @@ class Manager:
                     last_time = self.workers[key]['last_heartbeat']
                     if time.time() - last_time > 10:
                         self.workers[key]['status'] = 'dead'
+                        self.partitions.append(self.worker[key]['tasks'])
                         print(key, "has dead")
                 # handle busy waiting
                 time.sleep(0.1)
@@ -148,6 +151,7 @@ class Manager:
     def handle_register(self, message_dict):
         # handle registration
         status = 'ready'
+        print('111111')
         # Send an acknowledgement back to the worker
         # time.sleep(1)
         ack_msg = {
@@ -166,7 +170,7 @@ class Manager:
             'worker_host': message_dict['worker_host'],
             'worker_port': message_dict['worker_port'],
             'status': status,
-            'tasks': -1,
+            'tasks': {},
             'last_heartbeat': time.time(),
             'num_completed_tasks': 0
         }
@@ -218,11 +222,21 @@ class Manager:
                         for i, file in enumerate(sorted_files):
                             partitions[i % job['num_mappers']].append(file)
                         for task_id, partition in enumerate(partitions):
+                            part = {
+                                'task_id' : task_id,
+                                'partition' : partition
+                            }
+                            self.partitions.append(part)
+                        while self.partitions and not self.shutdown:
+                            part = self.partitions.pop()
+                            task_id = part['task_id']
+                            partition = part['partition']
                             input_path = [os.path.join(job['input_directory'], filename) for filename in partition]
                             # print(partition)
                             assigned = False
-                            while not assigned:
+                            while not assigned and not self.shutdown:
                                 for key in self.workers:
+                                    print('ok')
                                     if self.workers[key]['status'] == 'ready':
                                         # print(key)
                                         message = {
@@ -242,7 +256,7 @@ class Manager:
                                                     (self.workers[key]['worker_host'], self.workers[key]['worker_port']))
                                                 sock.sendall(json.dumps(message).encode('utf-8'))
                                                 self.workers[key]['status'] = 'busy'
-                                                self.workers[key]['tasks'] = task_id
+                                                self.workers[key]['tasks'] = part
                                                 assigned = True
                                             except ConnectionRefusedError:
                                                 self.workers[key]['status'] = 'dead'
@@ -259,11 +273,10 @@ class Manager:
         pass
 
     def handle_finished(self, message_dict):
-
         for key in self.workers:
-            if self.workers[key]['tasks'] == message_dict['task_id']:
+            if self.workers[key]['tasks']['task_id'] == message_dict['task_id']:
                 self.workers[key]['status'] = 'ready'
-                self.workers[key]['tasks'] = -1
+                self.workers[key]['tasks'] = {}
 
 
 
