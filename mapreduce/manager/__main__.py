@@ -114,7 +114,7 @@ class Manager:
                         self.handle_partitioning()
 
                     elif message_dict['message_type'] == 'finished':
-                        self.handle_finished()
+                        self.handle_finished(message_dict)
 
             # handle busy waiting
             time.sleep(0.1)
@@ -166,7 +166,7 @@ class Manager:
             'worker_host': message_dict['worker_host'],
             'worker_port': message_dict['worker_port'],
             'status': status,
-            'tasks': [],
+            'tasks': -1,
             'last_heartbeat': time.time(),
             'num_completed_tasks': 0
         }
@@ -208,7 +208,6 @@ class Manager:
                 if os.path.exists(outdir):
                     os.rmdir(outdir)
                 os.mkdir(outdir)
-                print("output made")
                 prefix = f"mapreduce-shared-job{job['job_id']:05d}-"
                 with tempfile.TemporaryDirectory(prefix=prefix) as tmpdir:
                     LOGGER.info("Created tmpdir %s", tmpdir)
@@ -220,13 +219,12 @@ class Manager:
                             partitions[i % job['num_mappers']].append(file)
                         for task_id, partition in enumerate(partitions):
                             input_path = [os.path.join(job['input_directory'], filename) for filename in partition]
-                            while True:
+                            # print(partition)
+                            assigned = False
+                            while not assigned:
                                 for key in self.workers:
-                                    print("000000")
-                                    print(key)
-                                    print(self.workers[key]['status'])
                                     if self.workers[key]['status'] == 'ready':
-                                        # print("self.workers[key]")
+                                        # print(key)
                                         message = {
                                             "message_type": "new_map_task",
                                             "task_id": task_id,
@@ -237,31 +235,36 @@ class Manager:
                                             "worker_host": self.workers[key]['worker_host'],
                                             "worker_port": self.workers[key]['worker_port']
                                         }
-                                        print("0000000")
-                                        print(message)
+                                        # print(message)
                                         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
                                             try:
                                                 sock.connect(
                                                     (self.workers[key]['worker_host'], self.workers[key]['worker_port']))
                                                 sock.sendall(json.dumps(message).encode('utf-8'))
                                                 self.workers[key]['status'] = 'busy'
-                                                self.workers[key]['tasks'] = partition
+                                                self.workers[key]['tasks'] = task_id
+                                                assigned = True
                                             except ConnectionRefusedError:
                                                 self.workers[key]['status'] = 'dead'
                                         break
-                                else:
-                                    time.sleep(0.1)
-                                    continue
-                                break
+                                time.sleep(0.1)
+                                continue
+                        finished = True
                                     
-                            
-                        time.sleep(0.1)
 
                 LOGGER.info("Cleaned up tmpdir %s", tmpdir)
             time.sleep(0.1)
 
     def handle_partioning(self):
         pass
+
+    def handle_finished(self, message_dict):
+
+        for key in self.workers:
+            if self.workers[key]['tasks'] == message_dict['task_id']:
+                self.workers[key]['status'] = 'ready'
+                self.workers[key]['tasks'] = -1
+
 
 
 @click.command()
