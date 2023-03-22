@@ -211,6 +211,7 @@ class Manager:
                 prefix = f"mapreduce-shared-job{job['job_id']:05d}-"
                 with tempfile.TemporaryDirectory(prefix=prefix) as tmpdir:
                     LOGGER.info("Created tmpdir %s", tmpdir)
+                    print("create new dir in manager ", prefix)
                     while not finished and not self.shutdown:
                         files = os.listdir(job['input_directory'])
                         sorted_files = sorted(files)
