@@ -12,6 +12,7 @@ import shutil
 import threading
 import hashlib
 import subprocess
+import heapq
 
 # Configure logging
 LOGGER = logging.getLogger(__name__)
@@ -121,6 +122,8 @@ class Worker:
                         
                     elif message_dict['message_type'] == 'new_map_task':
                         self.handle_mapping(message_dict)
+                    elif message_dict['message_type'] == 'new_reduce_task':
+                        self.handle_reducing(message_dict)
 
                     # receive shutdown message, send shut down message to every worker
                     elif message_dict['message_type'] == 'shutdown':
@@ -142,6 +145,7 @@ class Worker:
             sock.sendall(json.dumps(message).encode('utf-8'))
     
     def handle_mapping(self, message_dict):
+        # TODO: why do we need the while loop here?
         while not self.shutdown:
             executable = message_dict['executable']
             prefix = f"mapreduce-local-task{message_dict['task_id']}-"
@@ -188,7 +192,50 @@ class Worker:
                 sock.sendall(json.dumps(message).encode('utf-8'))
             break
 
+    def handle_reducing(self, message_dict):
+        executable = message_dict['executable']
+        prefix = f"mapreduce-local-task{message_dict['task_id']}-"
+        with tempfile.TemporaryDirectory(prefix=prefix) as tmpdir:
+            partition_number = message_dict['partition_number']
+            prev_temp_files = [
+                os.path.join(message_dict['input_directory'], f)
+                for f in message_dict['input_files']
+            ]
 
+            # Merge map files 
+            input_streams = [open(f, "r") for f in prev_temp_files]
+            merged_stream = heapq.merge(*input_streams)
+
+            # Run reduce executable 
+            output_file = os.path.join(tmpdir, f"part{message_dict['task_id']:05}")
+            with open(output_file, "w") as outfile:
+                with subprocess.Popen(
+                    [executable],
+                    stdin=subprocess.PIPE,
+                    stdout=outfile,
+                    text=True,
+                ) as reduce_process:
+                    for line in merged_stream:
+                        reduce_process.stdin.write(line)
+
+            # Close input_streams
+            for stream in input_streams:
+                stream.close()
+
+            # Move the output file to the final output directory specified by the Manager
+            final_output_path = os.path.join(message_dict['output_directory'], f"part{partition_number:05}")
+            shutil.move(output_file, final_output_path)
+
+            # Send a finished message to the Manager
+            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+                sock.connect((self.manager_host, self.manager_port))
+                message = {
+                    'message_type': 'finished',
+                    'task_id': message_dict['task_id'],
+                    'worker_host': self.host,
+                    'worker_port': self.port
+                }
+                sock.sendall(json.dumps(message).encode('utf-8'))
 
 
 @click.command()

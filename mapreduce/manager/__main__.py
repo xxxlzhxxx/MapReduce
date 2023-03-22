@@ -102,10 +102,6 @@ class Manager:
                     elif message_dict['message_type'] == 'new_manager_job':
                         self.handle_new_job(message_dict)
 
-                    # TODO: handle input partitioning
-                    elif message_dict['message_type'] == 'new_map_task':
-                        self.handle_partitioning()
-
                     elif message_dict['message_type'] == 'finished':
                         self.handle_finished(message_dict)
 
@@ -171,9 +167,6 @@ class Manager:
             'num_completed_tasks': 0
         }
 
-    def assigning_work(self):
-        pass
-
     def handle_shutdown(self):
         message = {'message_type': 'shutdown'}
         for key in self.workers:
@@ -197,13 +190,14 @@ class Manager:
         }
         self.job_queue.append(job)
         self.job_num += 1
+    
 
     def run_job(self):
         while not self.shutdown:
             finished = False
             if self.job_queue:
                 job = self.job_queue.pop()
-
+                # runnning a job
                 outdir = job['output_directory']
                 if os.path.exists(outdir):
                     os.rmdir(outdir)
@@ -212,6 +206,7 @@ class Manager:
                 with tempfile.TemporaryDirectory(prefix=prefix) as tmpdir:
                     LOGGER.info("Created tmpdir %s", tmpdir)
                     while not finished and not self.shutdown:
+                        # get partitions
                         files = os.listdir(job['input_directory'])
                         sorted_files = sorted(files)
                         partitions = [[] for i in range(job['num_mappers'])]
@@ -223,6 +218,7 @@ class Manager:
                                 'partition' : partition
                             }
                             self.partitions.append(part)
+                        # assign partitions to workers one by one
                         while self.partitions and not self.shutdown:
                             part = self.partitions.pop()
                             task_id = part['task_id']
@@ -231,9 +227,8 @@ class Manager:
                             # print(partition)
                             assigned = False
                             while not assigned and not self.shutdown:
-                                for key in self.workers:
-                                    
-                                    if self.workers[key]['status'] == 'ready':
+                                for wroker_id in self.workers:
+                                    if self.workers[wroker_id]['status'] == 'ready':
                                         # print(key)
                                         message = {
                                             "message_type": "new_map_task",
@@ -242,30 +237,60 @@ class Manager:
                                             "executable": job['mapper_executable'],
                                             "output_directory": tmpdir,
                                             "num_partitions": job['num_reducers'],
-                                            "worker_host": self.workers[key]['worker_host'],
-                                            "worker_port": self.workers[key]['worker_port']
+                                            "worker_host": self.workers[wroker_id]['worker_host'],
+                                            "worker_port": self.workers[wroker_id]['worker_port']
                                         }
                                         # print(message)
                                         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
                                             try:
                                                 sock.connect(
-                                                    (self.workers[key]['worker_host'], self.workers[key]['worker_port']))
+                                                    (self.workers[wroker_id]['worker_host'], self.workers[wroker_id]['worker_port']))
                                                 sock.sendall(json.dumps(
                                                     message).encode('utf-8'))
-                                                self.workers[key]['status'] = 'busy'
-                                                self.workers[key]['tasks'] = part
+                                                self.workers[wroker_id]['status'] = 'busy'
+                                                self.workers[wroker_id]['tasks'] = part
                                                 assigned = True
                                             except ConnectionRefusedError:
-                                                self.workers[key]['status'] = 'dead'
+                                                self.workers[wroker_id]['status'] = 'dead'
                                         break
                                 time.sleep(0.1)
-                                continue
+                        # Reduce tasks
+                        while job['num_reducers'] > 0 and not self.shutdown:
+                            assigned = False
+                            while not assigned and not self.shutdown:
+                                for wroker_id in self.workers:
+                                    if self.workers[wroker_id]['status'] == 'ready':
+                                        message = {
+                                            "message_type": "new_reduce_task",
+                                            "task_id": job['num_reducers'] - 1,
+                                            "input_directory": tmpdir,
+                                            "executable": job['reducer_executable'],
+                                            "output_directory": outdir,
+                                            "worker_host": self.workers[wroker_id]['worker_host'],
+                                            "worker_port": self.workers[wroker_id]['worker_port']
+                                        }
+                                        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+                                            try:
+                                                sock.connect(
+                                                    (self.workers[wroker_id]['worker_host'], self.workers[wroker_id]['worker_port']))
+                                                sock.sendall(json.dumps(
+                                                    message).encode('utf-8'))
+                                                self.workers[wroker_id]['status'] = 'busy'
+                                                assigned = True
+                                            except ConnectionRefusedError:
+                                                self.workers[wroker_id]['status'] = 'dead'
+                                        break
+                                time.sleep(0.1)
+                            job['num_reducers'] -= 1
                         finished = True
 
                 LOGGER.info("Cleaned up tmpdir %s", tmpdir)
             time.sleep(0.1)
 
     def handle_partioning(self):
+        pass
+
+    def handle_reduce(self):
         pass
 
     def handle_finished(self, message_dict):
