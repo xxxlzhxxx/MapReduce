@@ -31,6 +31,7 @@ class Manager:
         # create an array to store all the info of workers
         self.port = port
         self.host = host
+        self.finishNum = 0
         self.shutdown = False
         self.workers = {}
         self.job_queue = collections.deque()
@@ -131,11 +132,13 @@ class Manager:
                 self.workers[(message_dict['worker_host'], 
                               message_dict['worker_port'])]['last_heartbeat'] = time.time()
                 for key in self.workers:
-                    last_time = self.workers[key]['last_heartbeat']
-                    if time.time() - last_time > 10:
-                        self.workers[key]['status'] = 'dead'
-                        self.partitions.append(self.workers[key]['tasks'])
-                        print(key, "has dead")
+                    if self.workers[key]['status'] != 'dead':
+                        last_time = self.workers[key]['last_heartbeat']
+                        if time.time() - last_time > 10:
+                            self.workers[key]['status'] = 'dead'
+                            self.partitions.append(self.workers[key]['tasks'])
+                            # print(self.partitions)
+                            print(key, "has dead")
 
                 # handle busy waiting
                 time.sleep(0.1)
@@ -220,48 +223,56 @@ class Manager:
                                 'partition' : partition
                             }
                             self.partitions.append(part)
+                            self.finishNum += 1
                         # assign partitions to workers one by one
-                        while self.partitions and not self.shutdown:
-                            part = self.partitions.popleft()
-                            task_id = part['task_id']
-                            partition = part['partition']
-                            input_path = [os.path.join(job['input_directory'], filename) for filename in partition]
-                            # print(partition)
-                            assigned = False
-                            while not assigned and not self.shutdown:
-                                for wroker_id in self.workers:
-                                    print(self.workers[wroker_id]['status'])
-                                    if self.workers[wroker_id]['status'] == 'ready':
-                                        # print(key)
-                                        message = {
-                                            "message_type": "new_map_task",
-                                            "task_id": task_id,
-                                            "input_paths": input_path,
-                                            "executable": job['mapper_executable'],
-                                            "output_directory": tmpdir,
-                                            "num_partitions": job['num_reducers'],
-                                            "worker_host": self.workers[wroker_id]['worker_host'],
-                                            "worker_port": self.workers[wroker_id]['worker_port']
-                                        }
-                                        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
-                                            try:
-                                                sock.connect(
-                                                    (self.workers[wroker_id]['worker_host'], self.workers[wroker_id]['worker_port']))
-                                                sock.sendall(json.dumps(
-                                                    message).encode('utf-8'))
-                                                self.workers[wroker_id]['status'] = 'busy'
-                                                self.workers[wroker_id]['tasks'] = part
-                                                assigned = True
-                                            except ConnectionRefusedError:
-                                                self.workers[wroker_id]['status'] = 'dead'
-                                        break
-                                time.sleep(0.1)
+                        while self.finishNum:
+                            if self.shutdown:
+                                break
+                            if self.partitions:
+                                part = self.partitions.popleft()
+                                task_id = part['task_id']
+                                partition = part['partition']
+                                input_path = [os.path.join(job['input_directory'], filename) for filename in partition]
+                                print(partition)
+                                assigned = False
+                                while not assigned and not self.shutdown:
+                                    for wroker_id in self.workers:
+                                        print(wroker_id)
+                                        print(self.workers[wroker_id]['status'])
+                                        if self.workers[wroker_id]['status'] == 'ready':
+                                            # print(key)
+                                            # print(11111)
+                                            message = {
+                                                "message_type": "new_map_task",
+                                                "task_id": task_id,
+                                                "input_paths": input_path,
+                                                "executable": job['mapper_executable'],
+                                                "output_directory": tmpdir,
+                                                "num_partitions": job['num_reducers'],
+                                                "worker_host": self.workers[wroker_id]['worker_host'],
+                                                "worker_port": self.workers[wroker_id]['worker_port']
+                                            }
+                                            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+                                                try:
+                                                    sock.connect(
+                                                        (self.workers[wroker_id]['worker_host'], self.workers[wroker_id]['worker_port']))
+                                                    sock.sendall(json.dumps(
+                                                        message).encode('utf-8'))
+                                                    self.workers[wroker_id]['status'] = 'busy'
+                                                    self.workers[wroker_id]['tasks'] = part
+                                                    assigned = True
+                                                except ConnectionRefusedError:
+                                                    self.workers[wroker_id]['status'] = 'dead'
+                                            break
+                                    time.sleep(0.1)
+                            time.sleep(0.1)
                         # Reduce tasks
                         while job['num_reducers'] > 0 and not self.shutdown:
                             assigned = False
                             while not assigned and not self.shutdown:
                                 for wroker_id in self.workers:
                                     if self.workers[wroker_id]['status'] == 'ready':
+                                        # print(111111)
                                         message = {
                                             "message_type": "new_reduce_task",
                                             "task_id": job['num_reducers'] - 1,
@@ -296,8 +307,9 @@ class Manager:
         pass
 
     def handle_finished(self, message_dict):
+        self.finishNum -= 1
         for wroker_id in self.workers:
-            print(self.workers[wroker_id])
+            # print(self.workers[wroker_id])
             if self.workers[wroker_id]['tasks']['task_id'] == message_dict['task_id']:
                 self.workers[wroker_id]['status'] = 'ready'
                 self.workers[wroker_id]['tasks'] = {}
