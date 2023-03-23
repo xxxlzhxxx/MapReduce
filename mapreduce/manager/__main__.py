@@ -75,6 +75,7 @@ class Manager:
                     while True:
                         try:
                             data = conn.recv(4096)
+                            # print(data)
                         except socket.timeout:
                             continue
                         if not data:
@@ -196,7 +197,7 @@ class Manager:
         while not self.shutdown:
             finished = False
             if self.job_queue:
-                job = self.job_queue.pop()
+                job = self.job_queue.popleft()
                 # runnning a job
                 outdir = job['output_directory']
                 if os.path.exists(outdir):
@@ -221,7 +222,7 @@ class Manager:
                             self.partitions.append(part)
                         # assign partitions to workers one by one
                         while self.partitions and not self.shutdown:
-                            part = self.partitions.pop()
+                            part = self.partitions.popleft()
                             task_id = part['task_id']
                             partition = part['partition']
                             input_path = [os.path.join(job['input_directory'], filename) for filename in partition]
@@ -229,6 +230,7 @@ class Manager:
                             assigned = False
                             while not assigned and not self.shutdown:
                                 for wroker_id in self.workers:
+                                    print(self.workers[wroker_id]['status'])
                                     if self.workers[wroker_id]['status'] == 'ready':
                                         # print(key)
                                         message = {
@@ -241,7 +243,6 @@ class Manager:
                                             "worker_host": self.workers[wroker_id]['worker_host'],
                                             "worker_port": self.workers[wroker_id]['worker_port']
                                         }
-                                        # print(message)
                                         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
                                             try:
                                                 sock.connect(
@@ -295,10 +296,11 @@ class Manager:
         pass
 
     def handle_finished(self, message_dict):
-        for key in self.workers:
-            if self.workers[key]['tasks']['task_id'] == message_dict['task_id']:
-                self.workers[key]['status'] = 'ready'
-                self.workers[key]['tasks'] = {}
+        for wroker_id in self.workers:
+            print(self.workers[wroker_id])
+            if self.workers[wroker_id]['tasks']['task_id'] == message_dict['task_id']:
+                self.workers[wroker_id]['status'] = 'ready'
+                self.workers[wroker_id]['tasks'] = {}
 
 
 
