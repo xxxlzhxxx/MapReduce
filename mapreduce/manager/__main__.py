@@ -160,7 +160,11 @@ class Manager:
                 sock.sendall(json.dumps(ack_msg).encode('utf-8'))
             except ConnectionRefusedError:
                 status = 'dead'
-        
+                
+        if (message_dict['worker_host'], message_dict['worker_port']) in self.workers:
+            if self.workers[(message_dict['worker_host'], message_dict['worker_port'])]['status'] == 'busy':
+                # TODO: redistribute its task as it has dead
+                pass
 
         self.workers[(message_dict['worker_host'], message_dict['worker_port'])] = {
             'worker_host': message_dict['worker_host'],

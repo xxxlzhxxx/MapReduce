@@ -86,7 +86,7 @@ def worker_message_generator(mock_sendall, tmp_path):
     # to receive.
     for _ in utils.wait_for_map_messages(mock_sendall, num=3):
         yield None
-
+    print ("for map message")
     # Status finished messages from one mapper.  This Worker was reassigned the
     # task that the dead Worker failed to complete.
     yield json.dumps({
