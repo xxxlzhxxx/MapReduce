@@ -137,6 +137,7 @@ class Manager:
                         if time.time() - last_time > 10:
                             self.workers[key]['status'] = 'dead'
                             self.partitions.append(self.workers[key]['tasks'])
+                            self.workers[key]['tasks'] = {}
                             # print(self.partitions)
                             print(key, "has dead")
 
@@ -164,7 +165,8 @@ class Manager:
         if (message_dict['worker_host'], message_dict['worker_port']) in self.workers:
             if self.workers[(message_dict['worker_host'], message_dict['worker_port'])]['status'] == 'busy':
                 # TODO: redistribute its task as it has dead
-                pass
+                self.partitions.append(self.workers[(message_dict['worker_host'], message_dict['worker_port'])]['tasks'])
+                self.workers[(message_dict['worker_host'], message_dict['worker_port'])]['tasks'] = {}
 
         self.workers[(message_dict['worker_host'], message_dict['worker_port'])] = {
             'worker_host': message_dict['worker_host'],
