@@ -32,7 +32,6 @@ class Manager:
         self.port = port
         self.host = host
         self.finishNum = 0
-        self.shutdown = False
         self.workers = {}
         self.job_queue = collections.deque()
         self.task_queue = collections.deque()
@@ -64,7 +63,7 @@ class Manager:
             self.tcp_socket.bind((self.host, self.port))
             self.tcp_socket.listen()
             self.tcp_socket.settimeout(1)
-            while not self.shutdown:
+            while True:
                 # Accept a connection from a worker
                 try:
                     conn, addr = self.tcp_socket.accept()
@@ -117,7 +116,7 @@ class Manager:
             self.udp_socket.bind((self.host, self.port))
             self.udp_socket.settimeout(1)
 
-            while not self.shutdown:
+            while True:
                 try:
                     message_bytes = self.udp_socket.recv(4096)
                 except socket.timeout:
@@ -180,13 +179,14 @@ class Manager:
     def handle_shutdown(self):
         message = {'message_type': 'shutdown'}
         for key in self.workers:
-            print(key)
+            LOGGER.info("Sending shutdown message to worker %s:%d",
+                        self.workers[key]['worker_host'], self.workers[key]['worker_port'])
             with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
                 sock.connect(
                     (self.workers[key]['worker_host'], self.workers[key]['worker_port']))
                 sock.sendall(json.dumps(message).encode('utf-8'))
-        self.shutdown = True
-        print('shuting down manager...')
+        LOGGER.info("Shutting down manager")
+        exit()
 
     def handle_new_job(self, message_dict):
         job = {
@@ -203,20 +203,20 @@ class Manager:
     
 
     def run_job(self):
-        while not self.shutdown:
+        while True:
             finished = False
             if self.job_queue:
                 job = self.job_queue.popleft()
                 # runnning a job
-                outdir = job['output_directory']
-                if os.path.exists(outdir):
-                    os.rmdir(outdir)
-                os.mkdir(outdir)
+                out_dir = job['output_directory']
+                if os.path.exists(out_dir):
+                    os.rmdir(out_dir)
+                os.mkdir(out_dir)
                 prefix = f"mapreduce-shared-job{job['job_id']:05d}-"
                 with tempfile.TemporaryDirectory(prefix=prefix) as tmpdir:
                     LOGGER.info("Created tmpdir %s", tmpdir)
                     print("create new dir in manager ", prefix)
-                    while not finished and not self.shutdown:
+                    while not finished:
                         # get partitions
                         self.handle_mapping(job, tmpdir)
                         # Reduce tasks
@@ -240,15 +240,13 @@ class Manager:
             self.partitions.append(part)
             self.finishNum += 1
         while self.finishNum:
-            if self.shutdown:
-                break
             if self.partitions:
                 part = self.partitions.popleft()
                 task_id = part['task_id']
                 partition = part['partition']
                 input_path = [os.path.join(job['input_directory'], filename) for filename in partition]
                 assigned = False
-                while not assigned and not self.shutdown:
+                while not assigned:
                     for wroker_id in self.workers:
                         if self.workers[wroker_id]['status'] == 'ready':
                             message = {
@@ -283,7 +281,7 @@ class Manager:
         task_id = 0
         all_temp_files = os.listdir(tmpdir)
         finished_tasks = []
-        while not self.shutdown:
+        while True:
             assigned = False
             while not assigned:
                 for wroker_id in self.workers:
