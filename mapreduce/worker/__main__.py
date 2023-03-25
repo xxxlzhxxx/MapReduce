@@ -225,7 +225,7 @@ class Worker:
 
             # Move the output file to the final output directory specified by the Manager
             task_id = message_dict['task_id']
-            final_output_path = os.path.join(message_dict['output_directory'], f"part{task_id:05}")
+            final_output_path = os.path.join(message_dict['output_directory'], f"part-{task_id:05}")
             LOGGER.debug(f"Moved {output_file} -> {final_output_path}")
             shutil.move(output_file, final_output_path)
 
