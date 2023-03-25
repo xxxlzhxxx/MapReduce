@@ -267,12 +267,13 @@ class Manager:
                                         (self.workers[wroker_id]['worker_host'], self.workers[wroker_id]['worker_port']))
                                     sock.sendall(json.dumps(
                                         message).encode('utf-8'))
+                                except ConnectionRefusedError:
+                                    self.workers[wroker_id]['status'] = 'dead'
+                                else:
                                     self.workers[wroker_id]['status'] = 'busy'
                                     self.workers[wroker_id]['tasks'] = part
                                     assigned = True
-                                except ConnectionRefusedError:
-                                    self.workers[wroker_id]['status'] = 'dead'
-                            break
+                                    break
                     time.sleep(0.1)
             time.sleep(0.1)
 
