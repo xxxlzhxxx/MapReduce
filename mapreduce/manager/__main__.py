@@ -287,6 +287,7 @@ class Manager:
             while not assigned:
                 for wroker_id in self.workers:
                     if self.workers[wroker_id]['status'] == 'ready':
+                        # get related files from task_id
                         input_paths = []
                         for filename in all_temp_files:
                             if filename[-5:] == f"{task_id:05}":
@@ -303,17 +304,26 @@ class Manager:
                         LOGGER.debug("sending reduce task\n %s", message)
                         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
                             try:
+                                LOGGER.log("hi")
                                 sock.connect(
                                     (self.workers[wroker_id]['worker_host'], self.workers[wroker_id]['worker_port']))
+                                LOGGER.log("hi")
                                 sock.sendall(json.dumps(
                                     message).encode('utf-8'))
-                                self.workers[wroker_id]['status'] = 'busy'
-                                assigned = True
+                                LOGGER.log("hi")
                             except ConnectionRefusedError:
+                                LOGGER.log("worker %s is dead", wroker_id)
                                 self.workers[wroker_id]['status'] = 'dead'
                             else:
+                                LOGGER.log("worker %s is on the work", wroker_id)
+                                self.workers[wroker_id]['status'] = 'busy'
+                                self.workers[wroker_id]['tasks'] = task_id
+                                assigned = True
                                 break
                 time.sleep(0.1)
+                task_id += 1
+                if task_id >= job['num_reducers']:
+                    break
             job['num_reducers'] -= 1
 
     def handle_finished(self, message_dict):
