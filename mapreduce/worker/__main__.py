@@ -116,7 +116,8 @@ class Worker:
                         message_dict = json.loads(message_str)
                     except json.JSONDecodeError:
                         continue
-
+                    
+                    print('manager TCP:', message_dict)
                     # Add the worker to the list of registered workers
                     if message_dict['message_type'] == 'register_ack':
                         self.start = True

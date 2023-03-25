@@ -80,6 +80,7 @@ class Manager:
                         except socket.timeout:
                             continue
                         if not data:
+                            print('None')
                             break
                         message_chunks.append(data)
 
@@ -89,8 +90,8 @@ class Manager:
                         message_dict = json.loads(message_str)
                     except json.JSONDecodeError:
                         continue
-
-                    print(message_dict)
+                    
+                    print('Manager TCP received:',message_dict)
 
                     # Add the worker to the list of registered workers
                     if message_dict['message_type'] == 'register':
