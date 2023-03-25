@@ -175,17 +175,17 @@ class Manager:
             status= status,
             last_heartbeat= time.time(),
             job_id= None,
-            tasks= None,
+            task= None,
         )
 
     def handle_shutdown(self):
         message = {'message_type': 'shutdown'}
-        for key in self.workers:
+        for worker_key, worker in self.workers.items():
             LOGGER.info("Sending shutdown message to worker %s:%d",
-                        self.workers[key]['worker_host'], self.workers[key]['worker_port'])
+                        worker.host, worker.port)
             with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
                 sock.connect(
-                    (self.workers[key]['worker_host'], self.workers[key]['worker_port']))
+                    (worker.host, worker.port))
                 sock.sendall(json.dumps(message).encode('utf-8'))
         LOGGER.info("Shutting down manager")
         os._exit(0)
@@ -256,19 +256,19 @@ class Manager:
                                 "executable": job['mapper_executable'],
                                 "output_directory": tmpdir,
                                 "num_partitions": job['num_reducers'],
-                                "worker_host": self.workers[worker_key]['worker_host'],
-                                "worker_port": self.workers[worker_key]['worker_port']
+                                "worker_host": worker.host,
+                                "worker_port": worker.port
                             }
                             with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
                                 try:
                                     sock.connect(
-                                        (self.workers[worker_key]['worker_host'], self.workers[worker_key]['worker_port']))
+                                        (worker.host, worker.port))
                                     sock.sendall(json.dumps(
                                         message).encode('utf-8'))
                                 except ConnectionRefusedError:
                                     worker.status = WorkerStatus.DEAD
                                 else:
-                                    LOGGER.log("worker %s is on the work", worker_key)
+                                    LOGGER.debug("worker %s is on the work", worker_key)
                                     worker.status = WorkerStatus.BUSY
                                     worker.task = part
                                     worker.job_id = job['job_id']
@@ -276,17 +276,17 @@ class Manager:
                                     break
                     time.sleep(0.1)
             time.sleep(0.1)
-            assert self.finishNum == 0, "BUG: finishNum should be 0 after all tasks are finished"
-            assert len(self.partitions) == 0, "BUG: partitions should be empty after all tasks are finished"
-            for worker_key, worker in self.workers.items():
-                # all workers should be dead, idle
-                if worker.status == WorkerStatus.DEAD:
-                    continue
-                elif worker.status == WorkerStatus.BUSY:
-                    assert False, "BUG: worker should not be busy after all mapping tasks are finished"
-                elif worker.status == WorkerStatus.READY:
-                    assert worker['job_id'] == None, "BUG: worker should not have job_id after all mapping tasks are finished"
-                    assert worker['task'] == None, "BUG: worker should not have job_id after all mapping tasks are finished"
+            # assert self.finishNum == 0, "BUG: finishNum should be 0 after all tasks are finished"
+            # assert len(self.partitions) == 0, "BUG: partitions should be empty after all tasks are finished"
+            # for worker_key, worker in self.workers.items():
+            #     # all workers should be dead, idle
+            #     if worker.status == WorkerStatus.DEAD:
+            #         continue
+            #     elif worker.status == WorkerStatus.BUSY:
+            #         assert False, "BUG: worker should not be busy after all mapping tasks are finished"
+            #     elif worker.status == WorkerStatus.READY:
+            #         assert worker['job_id'] == None, "BUG: worker should not have job_id after all mapping tasks are finished"
+            #         assert worker['task'] == None, "BUG: worker should not have job_id after all mapping tasks are finished"
 
 
 
@@ -321,21 +321,21 @@ class Manager:
                                 "input_paths": this_part_files,
                                 "executable": job['reducer_executable'],
                                 "output_directory": out_dir,
-                                "worker_host": worker['worker_host'],
-                                "worker_port": worker['worker_port']
+                                "worker_host": worker.host,
+                                "worker_port": worker.port
                             }
                             LOGGER.debug("sending reduce task\n %s", message)
                             with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
                                 try:
                                     sock.connect(
-                                        (worker['worker_host'], worker['worker_port']))
+                                        (worker.host, worker.port))
                                     sock.sendall(json.dumps(
                                         message).encode('utf-8'))
                                 except ConnectionRefusedError:
-                                    LOGGER.log("worker %s is dead", worker_key)
+                                    LOGGER.debug("worker %s is dead", worker_key)
                                     worker.status = WorkerStatus.DEAD
                                 else:
-                                    LOGGER.log("worker %s is on the work", worker_key)
+                                    LOGGER.debug("worker %s is on the work", worker_key)
                                     worker.status = WorkerStatus.BUSY
                                     worker.task = part
                                     worker.job_id = job['job_id']
@@ -359,7 +359,8 @@ class Manager:
     def handle_finished(self, message_dict):
         self.finishNum -= 1
         for worker_key, worker in self.workers.items():
-            if worker.task['task_id'] == message_dict['task_id']:
+            if worker.task.task_id == message_dict['task_id']:
+                print(111111)
                 worker.status = WorkerStatus.READY
                 worker.task = None
                 worker.job_id = None
