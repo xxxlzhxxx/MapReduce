@@ -280,6 +280,7 @@ class Manager:
         LOGGER.info("begin Reduce Stage")
         out_dir = job['output_directory']
         task_id = 0
+        all_temp_files = os.listdir(tmpdir)
         finished_tasks = []
         while not self.shutdown:
             assigned = False
@@ -287,15 +288,19 @@ class Manager:
                 for wroker_id in self.workers:
                     if self.workers[wroker_id]['status'] == 'ready':
                         input_paths = []
+                        for filename in all_temp_files:
+                            if filename[-5:] == f"{task_id:05}":
+                                input_paths.append(os.path.join(tmpdir, filename))
                         message = {
                             "message_type": "new_reduce_task",
                             "task_id": task_id,
-                            "input_paths": [os.path.join(tmpdir, filename) for filename in os.listdir(tmpdir)],
+                            "input_paths": input_paths,
                             "executable": job['reducer_executable'],
                             "output_directory": out_dir,
                             "worker_host": self.workers[wroker_id]['worker_host'],
                             "worker_port": self.workers[wroker_id]['worker_port']
                         }
+                        LOGGER.debug("sending reduce task\n %s", message)
                         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
                             try:
                                 sock.connect(
