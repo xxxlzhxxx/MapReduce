@@ -126,14 +126,12 @@ class Manager:
                 message_str = message_bytes.decode("utf-8")
                 message_dict = json.loads(message_str)
                 # detect whether a worker is dead
-                LOGGER.debug(message_dict)
+                print(message_dict)
                 if self.workers.get((message_dict['worker_host'], 
-                              message_dict['worker_port'])) is not None:
-                    self.workers[(message_dict['worker_host'], 
-                                message_dict['worker_port'])]['last_heartbeat'] = time.time()
-                else:
-                    LOGGER.debug("worker not found: %s", message_dict)
-
+                              message_dict['worker_port'])) is None:
+                    continue
+                self.workers[(message_dict['worker_host'], 
+                              message_dict['worker_port'])]['last_heartbeat'] = time.time()
                 for key in self.workers:
                     if self.workers[key]['status'] != 'dead':
                         last_time = self.workers[key]['last_heartbeat']
@@ -142,7 +140,7 @@ class Manager:
                             self.partitions.append(self.workers[key]['tasks'])
                             self.workers[key]['tasks'] = {}
                             # print(self.partitions)
-                            LOGGER.info("worker %s has dead", key)
+                            print(key, "has dead")
 
                 # handle busy waiting
                 time.sleep(0.1)
@@ -221,100 +219,90 @@ class Manager:
                     print("create new dir in manager ", prefix)
                     while not finished and not self.shutdown:
                         # get partitions
-                        files = os.listdir(job['input_directory'])
-                        sorted_files = sorted(files)
-                        partitions = [[] for i in range(job['num_mappers'])]
-                        for i, file in enumerate(sorted_files):
-                            partitions[i % job['num_mappers']].append(file)
-                        for task_id, partition in enumerate(partitions):
-                            part = {
-                                'task_id' : task_id,
-                                'partition' : partition
-                            }
-                            self.partitions.append(part)
-                            self.finishNum += 1
-                        # assign partitions to workers one by one
-                        while self.finishNum:
-                            if self.shutdown:
-                                break
-                            if self.partitions:
-                                part = self.partitions.popleft()
-                                task_id = part['task_id']
-                                partition = part['partition']
-                                input_path = [os.path.join(job['input_directory'], filename) for filename in partition]
-                                print(partition)
-                                assigned = False
-                                while not assigned and not self.shutdown:
-                                    for wroker_id in self.workers:
-                                        print(wroker_id)
-                                        print(self.workers[wroker_id]['status'])
-                                        if self.workers[wroker_id]['status'] == 'ready':
-                                            # print(key)
-                                            # print(11111)
-                                            message = {
-                                                "message_type": "new_map_task",
-                                                "task_id": task_id,
-                                                "input_paths": input_path,
-                                                "executable": job['mapper_executable'],
-                                                "output_directory": tmpdir,
-                                                "num_partitions": job['num_reducers'],
-                                                "worker_host": self.workers[wroker_id]['worker_host'],
-                                                "worker_port": self.workers[wroker_id]['worker_port']
-                                            }
-                                            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
-                                                try:
-                                                    sock.connect(
-                                                        (self.workers[wroker_id]['worker_host'], self.workers[wroker_id]['worker_port']))
-                                                    sock.sendall(json.dumps(
-                                                        message).encode('utf-8'))
-                                                    self.workers[wroker_id]['status'] = 'busy'
-                                                    self.workers[wroker_id]['tasks'] = part
-                                                    assigned = True
-                                                except ConnectionRefusedError:
-                                                    self.workers[wroker_id]['status'] = 'dead'
-                                            break
-                                    time.sleep(0.1)
-                            time.sleep(0.1)
+                        self.handle_mapping(job, tmpdir)
                         # Reduce tasks
-                        self.manage_reduce(job, tmpdir)
+                        while job['num_reducers'] > 0 and not self.shutdown:
+                            assigned = False
+                            while not assigned and not self.shutdown:
+                                for wroker_id in self.workers:
+                                    if self.workers[wroker_id]['status'] == 'ready':
+                                        # print(111111)
+                                        message = {
+                                            "message_type": "new_reduce_task",
+                                            "task_id": job['num_reducers'] - 1,
+                                            "input_directory": tmpdir,
+                                            "executable": job['reducer_executable'],
+                                            "output_directory": outdir,
+                                            "worker_host": self.workers[wroker_id]['worker_host'],
+                                            "worker_port": self.workers[wroker_id]['worker_port']
+                                        }
+                                        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+                                            try:
+                                                sock.connect(
+                                                    (self.workers[wroker_id]['worker_host'], self.workers[wroker_id]['worker_port']))
+                                                sock.sendall(json.dumps(
+                                                    message).encode('utf-8'))
+                                                self.workers[wroker_id]['status'] = 'busy'
+                                                assigned = True
+                                            except ConnectionRefusedError:
+                                                self.workers[wroker_id]['status'] = 'dead'
+                                        break
+                                time.sleep(0.1)
+                            job['num_reducers'] -= 1
+                        finished = True
 
                 LOGGER.info("Cleaned up tmpdir %s", tmpdir)
             time.sleep(0.1)
-    
-    def manage_reduce(self, job, tmpdir):
-        LOGGER.info("begin Reduce Stage")
-        out_dir = job['output_directory']
-        while job['num_reducers'] > 0 and not self.shutdown:
-            assigned = False
-            while not assigned and not self.shutdown:
-                for wroker_id in self.workers:
-                    if self.workers[wroker_id]['status'] == 'ready':
-                        message = {
-                            "message_type": "new_reduce_task",
-                            "task_id": job['num_reducers'] - 1,
-                            "executable": job['reducer_executable'],
-                            "input_paths": [os.path.join(tmpdir, filename) for filename in os.listdir(tmpdir)],
-                            "output_directory": out_dir,
-                            "worker_host": self.workers[wroker_id]['worker_host'],
-                            "worker_port": self.workers[wroker_id]['worker_port']
-                        }
-                        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
-                            try:
-                                sock.connect(
-                                    (self.workers[wroker_id]['worker_host'], self.workers[wroker_id]['worker_port']))
-                                sock.sendall(json.dumps(
-                                    message).encode('utf-8'))
-                                self.workers[wroker_id]['status'] = 'busy'
-                                assigned = True
-                            except ConnectionRefusedError:
-                                self.workers[wroker_id]['status'] = 'dead'
-                        break
-                time.sleep(0.1)
-            job['num_reducers'] -= 1
-        finished = True
 
-    def handle_partioning(self):
-        pass
+    def handle_mapping(self, job, tmpdir):
+        files = os.listdir(job['input_directory'])
+        sorted_files = sorted(files)
+        partitions = [[] for i in range(job['num_mappers'])]
+        for i, file in enumerate(sorted_files):
+            partitions[i % job['num_mappers']].append(file)
+        for task_id, partition in enumerate(partitions):
+            part = {
+                'task_id' : task_id,
+                'partition' : partition
+            }
+            self.partitions.append(part)
+            self.finishNum += 1
+        while self.finishNum:
+            if self.shutdown:
+                break
+            if self.partitions:
+                part = self.partitions.popleft()
+                task_id = part['task_id']
+                partition = part['partition']
+                input_path = [os.path.join(job['input_directory'], filename) for filename in partition]
+                assigned = False
+                while not assigned and not self.shutdown:
+                    for wroker_id in self.workers:
+                        if self.workers[wroker_id]['status'] == 'ready':
+                            message = {
+                                "message_type": "new_map_task",
+                                "task_id": task_id,
+                                "input_paths": input_path,
+                                "executable": job['mapper_executable'],
+                                "output_directory": tmpdir,
+                                "num_partitions": job['num_reducers'],
+                                "worker_host": self.workers[wroker_id]['worker_host'],
+                                "worker_port": self.workers[wroker_id]['worker_port']
+                            }
+                            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+                                try:
+                                    sock.connect(
+                                        (self.workers[wroker_id]['worker_host'], self.workers[wroker_id]['worker_port']))
+                                    sock.sendall(json.dumps(
+                                        message).encode('utf-8'))
+                                    self.workers[wroker_id]['status'] = 'busy'
+                                    self.workers[wroker_id]['tasks'] = part
+                                    assigned = True
+                                except ConnectionRefusedError:
+                                    self.workers[wroker_id]['status'] = 'dead'
+                            break
+                    time.sleep(0.1)
+            time.sleep(0.1)
 
     def handle_reduce(self):
         pass
