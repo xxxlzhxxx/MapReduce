@@ -185,7 +185,7 @@ class Manager:
                     (self.workers[key]['worker_host'], self.workers[key]['worker_port']))
                 sock.sendall(json.dumps(message).encode('utf-8'))
         LOGGER.info("Shutting down manager")
-        exit()
+        os._exit(0)
 
     def handle_new_job(self, message_dict):
         job = {

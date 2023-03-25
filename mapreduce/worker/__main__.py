@@ -45,7 +45,6 @@ class Worker:
         self.host = host
         self.manager_port = manager_port
         self.manager_host = manager_host
-        self.shutdown = False
         self.start = False
 
         # Create a new TCP socket server
@@ -75,7 +74,7 @@ class Worker:
                 "worker_host": self.host,
                 "worker_port": self.port
             })
-            while not self.shutdown:
+            while True:
                 if not self.start:
                     time.sleep(0.5)
                     continue
@@ -92,7 +91,7 @@ class Worker:
             self.tcp_socket.settimeout(1)
 
             self.register()
-            while not self.shutdown:
+            while True:
                 try:
                     conn, addr = self.tcp_socket.accept()
                 except socket.timeout:
@@ -128,8 +127,8 @@ class Worker:
 
                     # receive shutdown message, send shut down message to every worker
                     elif message_dict['message_type'] == 'shutdown':
-                        self.shutdown = True
-                        print('shutting down worker...')
+                        LOGGER.info('shutting down worker...')
+                        os._exit(0)
 
             # handle busy waiting
             time.sleep(0.1)
