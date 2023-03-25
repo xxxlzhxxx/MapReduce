@@ -149,7 +149,7 @@ class Worker:
         # TODO: why do we need the while loop here?
         while not self.shutdown:
             executable = message_dict['executable']
-            prefix = f"mapreduce-local-task{message_dict['task_id']}-"
+            prefix = f"mapreduce-local-task{message_dict['task_id']:05}-"
             with tempfile.TemporaryDirectory(prefix=prefix) as tmpdir:
                 for input_path in message_dict['input_paths']:
                     LOGGER.info("Created %s", tmpdir)
@@ -196,7 +196,7 @@ class Worker:
     def handle_reducing(self, message_dict):
         LOGGER.debug(f"received\n{message_dict}")
         executable = message_dict['executable']
-        prefix = f"mapreduce-local-task{message_dict['task_id']}-"
+        prefix = f"mapreduce-local-task{message_dict['task_id']:05}-"
         with tempfile.TemporaryDirectory(prefix=prefix) as tmpdir:
             LOGGER.debug(f"Created {tmpdir}")
             prev_temp_files = []
