@@ -105,9 +105,8 @@ class Manager:
 
                     elif message_dict['message_type'] == 'finished':
                         self.handle_finished(message_dict)
-
-            # handle busy waiting
-            time.sleep(0.1)
+                # handle busy waiting
+                time.sleep(0.1)
 
     def udp_server(self):
         with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as self.udp_socket:
