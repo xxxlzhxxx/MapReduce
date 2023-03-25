@@ -273,6 +273,7 @@ class Manager:
                                     time.sleep(0.1)
                             time.sleep(0.1)
                         # Reduce tasks
+                        LOGGER.info("begin Reduce Stage")
                         while job['num_reducers'] > 0 and not self.shutdown:
                             assigned = False
                             while not assigned and not self.shutdown:

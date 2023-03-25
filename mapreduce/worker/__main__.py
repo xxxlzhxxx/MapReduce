@@ -13,6 +13,7 @@ import threading
 import hashlib
 import subprocess
 import heapq
+import pathlib
 
 # Configure logging
 LOGGER = logging.getLogger(__name__)
@@ -193,20 +194,20 @@ class Worker:
             break
 
     def handle_reducing(self, message_dict):
+        LOGGER.debug(f"received\n{message_dict}")
         executable = message_dict['executable']
         prefix = f"mapreduce-local-task{message_dict['task_id']}-"
         with tempfile.TemporaryDirectory(prefix=prefix) as tmpdir:
-            partition_number = message_dict['partition_number']
-            prev_temp_files = [
-                os.path.join(message_dict['input_directory'], f)
-                for f in message_dict['input_files']
-            ]
-
+            LOGGER.debug(f"Created {tmpdir}")
+            prev_temp_files = []
+            for f in message_dict['input_paths']:
+                prev_temp_files.append(pathlib.Path(f).resolve())
             # Merge map files 
             input_streams = [open(f, "r") for f in prev_temp_files]
             merged_stream = heapq.merge(*input_streams)
 
             # Run reduce executable 
+            LOGGER.debug(f"Executed {executable}")
             output_file = os.path.join(tmpdir, f"part{message_dict['task_id']:05}")
             with open(output_file, "w") as outfile:
                 with subprocess.Popen(
@@ -223,19 +224,24 @@ class Worker:
                 stream.close()
 
             # Move the output file to the final output directory specified by the Manager
-            final_output_path = os.path.join(message_dict['output_directory'], f"part{partition_number:05}")
+            task_id = message_dict['task_id']
+            final_output_path = os.path.join(message_dict['output_directory'], f"part{task_id:05}")
+            LOGGER.debug(f"Moved {output_file} -> {final_output_path}")
             shutil.move(output_file, final_output_path)
 
-            # Send a finished message to the Manager
-            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
-                sock.connect((self.manager_host, self.manager_port))
-                message = {
-                    'message_type': 'finished',
-                    'task_id': message_dict['task_id'],
-                    'worker_host': self.host,
-                    'worker_port': self.port
-                }
-                sock.sendall(json.dumps(message).encode('utf-8'))
+        # Remove the temporary directory
+        LOGGER.debug(f"Removed {tmpdir}")
+
+        # Send a finished message to the Manager
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+            sock.connect((self.manager_host, self.manager_port))
+            message = {
+                'message_type': 'finished',
+                'task_id': message_dict['task_id'],
+                'worker_host': self.host,
+                'worker_port': self.port
+            }
+            sock.sendall(json.dumps(message).encode('utf-8'))
 
 
 @click.command()
