@@ -32,7 +32,6 @@ class Manager:
         self.port = port
         self.host = host
         self.finishNum = 0
-        self.shutdown = False
         self.workers = {}
         self.job_queue = collections.deque()
         self.task_queue = collections.deque()
@@ -64,7 +63,7 @@ class Manager:
             self.tcp_socket.bind((self.host, self.port))
             self.tcp_socket.listen()
             self.tcp_socket.settimeout(1)
-            while not self.shutdown:
+            while True:
                 # Accept a connection from a worker
                 try:
                     conn, addr = self.tcp_socket.accept()
@@ -107,9 +106,8 @@ class Manager:
 
                     elif message_dict['message_type'] == 'finished':
                         self.handle_finished(message_dict)
-
-            # handle busy waiting
-            time.sleep(0.1)
+                # handle busy waiting
+                time.sleep(0.1)
 
     def udp_server(self):
         with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as self.udp_socket:
@@ -118,7 +116,7 @@ class Manager:
             self.udp_socket.bind((self.host, self.port))
             self.udp_socket.settimeout(1)
 
-            while not self.shutdown:
+            while True:
                 try:
                     message_bytes = self.udp_socket.recv(4096)
                 except socket.timeout:
@@ -181,13 +179,14 @@ class Manager:
     def handle_shutdown(self):
         message = {'message_type': 'shutdown'}
         for key in self.workers:
-            print(key)
+            LOGGER.info("Sending shutdown message to worker %s:%d",
+                        self.workers[key]['worker_host'], self.workers[key]['worker_port'])
             with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
                 sock.connect(
                     (self.workers[key]['worker_host'], self.workers[key]['worker_port']))
                 sock.sendall(json.dumps(message).encode('utf-8'))
-        self.shutdown = True
-        print('shuting down manager...')
+        LOGGER.info("Shutting down manager")
+        exit()
 
     def handle_new_job(self, message_dict):
         job = {
@@ -204,56 +203,29 @@ class Manager:
     
 
     def run_job(self):
-        while not self.shutdown:
+        while True:
             finished = False
             if self.job_queue:
                 job = self.job_queue.popleft()
                 # runnning a job
-                outdir = job['output_directory']
-                if os.path.exists(outdir):
-                    os.rmdir(outdir)
-                os.mkdir(outdir)
+                out_dir = job['output_directory']
+                if os.path.exists(out_dir):
+                    os.rmdir(out_dir)
+                os.mkdir(out_dir)
                 prefix = f"mapreduce-shared-job{job['job_id']:05d}-"
                 with tempfile.TemporaryDirectory(prefix=prefix) as tmpdir:
                     LOGGER.info("Created tmpdir %s", tmpdir)
                     print("create new dir in manager ", prefix)
-                    while not finished and not self.shutdown:
+                    while not finished:
                         # get partitions
                         self.handle_mapping(job, tmpdir)
                         # Reduce tasks
-                        while job['num_reducers'] > 0 and not self.shutdown:
-                            assigned = False
-                            while not assigned and not self.shutdown:
-                                for wroker_id in self.workers:
-                                    if self.workers[wroker_id]['status'] == 'ready':
-                                        # print(111111)
-                                        message = {
-                                            "message_type": "new_reduce_task",
-                                            "task_id": job['num_reducers'] - 1,
-                                            "input_directory": tmpdir,
-                                            "executable": job['reducer_executable'],
-                                            "output_directory": outdir,
-                                            "worker_host": self.workers[wroker_id]['worker_host'],
-                                            "worker_port": self.workers[wroker_id]['worker_port']
-                                        }
-                                        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
-                                            try:
-                                                sock.connect(
-                                                    (self.workers[wroker_id]['worker_host'], self.workers[wroker_id]['worker_port']))
-                                                sock.sendall(json.dumps(
-                                                    message).encode('utf-8'))
-                                                self.workers[wroker_id]['status'] = 'busy'
-                                                assigned = True
-                                            except ConnectionRefusedError:
-                                                self.workers[wroker_id]['status'] = 'dead'
-                                        break
-                                time.sleep(0.1)
-                            job['num_reducers'] -= 1
+                        self.handle_reduce(job, tmpdir)
                         finished = True
 
                 LOGGER.info("Cleaned up tmpdir %s", tmpdir)
             time.sleep(0.1)
-
+    
     def handle_mapping(self, job, tmpdir):
         files = os.listdir(job['input_directory'])
         sorted_files = sorted(files)
@@ -268,15 +240,13 @@ class Manager:
             self.partitions.append(part)
             self.finishNum += 1
         while self.finishNum:
-            if self.shutdown:
-                break
             if self.partitions:
                 part = self.partitions.popleft()
                 task_id = part['task_id']
                 partition = part['partition']
                 input_path = [os.path.join(job['input_directory'], filename) for filename in partition]
                 assigned = False
-                while not assigned and not self.shutdown:
+                while not assigned:
                     for wroker_id in self.workers:
                         if self.workers[wroker_id]['status'] == 'ready':
                             message = {
@@ -295,17 +265,65 @@ class Manager:
                                         (self.workers[wroker_id]['worker_host'], self.workers[wroker_id]['worker_port']))
                                     sock.sendall(json.dumps(
                                         message).encode('utf-8'))
+                                except ConnectionRefusedError:
+                                    self.workers[wroker_id]['status'] = 'dead'
+                                else:
                                     self.workers[wroker_id]['status'] = 'busy'
                                     self.workers[wroker_id]['tasks'] = part
                                     assigned = True
-                                except ConnectionRefusedError:
-                                    self.workers[wroker_id]['status'] = 'dead'
-                            break
+                                    break
                     time.sleep(0.1)
             time.sleep(0.1)
 
-    def handle_reduce(self):
-        pass
+    def handle_reduce(self, job, tmpdir):
+        LOGGER.info("begin Reduce Stage")
+        out_dir = job['output_directory']
+        task_id = 0
+        all_temp_files = os.listdir(tmpdir)
+        finished_tasks = []
+        while True:
+            assigned = False
+            while not assigned:
+                for wroker_id in self.workers:
+                    if self.workers[wroker_id]['status'] == 'ready':
+                        # get related files from task_id
+                        input_paths = []
+                        for filename in all_temp_files:
+                            if filename[-5:] == f"{task_id:05}":
+                                input_paths.append(os.path.join(tmpdir, filename))
+                        message = {
+                            "message_type": "new_reduce_task",
+                            "task_id": task_id,
+                            "input_paths": input_paths,
+                            "executable": job['reducer_executable'],
+                            "output_directory": out_dir,
+                            "worker_host": self.workers[wroker_id]['worker_host'],
+                            "worker_port": self.workers[wroker_id]['worker_port']
+                        }
+                        LOGGER.debug("sending reduce task\n %s", message)
+                        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+                            try:
+                                LOGGER.log("hi")
+                                sock.connect(
+                                    (self.workers[wroker_id]['worker_host'], self.workers[wroker_id]['worker_port']))
+                                LOGGER.log("hi")
+                                sock.sendall(json.dumps(
+                                    message).encode('utf-8'))
+                                LOGGER.log("hi")
+                            except ConnectionRefusedError:
+                                LOGGER.log("worker %s is dead", wroker_id)
+                                self.workers[wroker_id]['status'] = 'dead'
+                            else:
+                                LOGGER.log("worker %s is on the work", wroker_id)
+                                self.workers[wroker_id]['status'] = 'busy'
+                                self.workers[wroker_id]['tasks'] = task_id
+                                assigned = True
+                                break
+                time.sleep(0.1)
+                task_id += 1
+                if task_id >= job['num_reducers']:
+                    break
+            job['num_reducers'] -= 1
 
     def handle_finished(self, message_dict):
         self.finishNum -= 1
