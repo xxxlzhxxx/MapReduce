@@ -87,6 +87,12 @@ def worker_message_generator(mock_sendall, tmp_path):
     for _ in utils.wait_for_map_messages(mock_sendall, num=3):
         yield None
     print ("for map message")
+    yield json.dumps({
+        "message_type": "test before"
+    }).encode("utf-8")
+    yield None
+
+    
     # Status finished messages from one mapper.  This Worker was reassigned the
     # task that the dead Worker failed to complete.
     yield json.dumps({
@@ -96,6 +102,9 @@ def worker_message_generator(mock_sendall, tmp_path):
         "worker_port": 3001,
     }).encode("utf-8")
     print("sent")
+    yield json.dumps({
+        "message_type": "test"
+    }).encode("utf-8")
     yield None
 
     # Wait for Manager to send reduce job message
