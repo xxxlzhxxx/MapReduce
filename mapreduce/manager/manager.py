@@ -55,35 +55,42 @@ class Manager:
         # Create a new TCP socket server
         with socket.socket(
             socket.AF_INET, socket.SOCK_STREAM
-        ) as tcp_socket:
-            tcp_socket.setsockopt(
+        ) as skt:
+            skt.setsockopt(
                 socket.SOL_SOCKET, socket.SO_REUSEADDR, 1
             )
-            tcp_socket.bind(self.address)
-            tcp_socket.listen()
-            tcp_socket.settimeout(1)
+            skt.bind(self.address)
+            LOGGER.debug("Re")
+            skt.listen()
+            skt.settimeout(1)
             while True:
                 # Accept a connection from a worker
                 try:
-                    conn, _ = tcp_socket.accept()
+                    conn, _ = skt.accept()
+                    LOGGER.debug("Re")
                 except socket.timeout:
                     continue
                 conn.settimeout(1)
                 with conn:
+                    LOGGER.debug("Re")
                     message_chunks = []
                     while True:
                         try:
+                            LOGGER.debug("Re")
                             data = conn.recv(4096)
+                            LOGGER.debug("Re")
                             # print(data)
                         except socket.timeout:
                             continue
                         if not data:
+                            LOGGER.debug("Re")
                             break
                         message_chunks.append(data)
-
+                    LOGGER.debug("Re")
                     message_bytes = b"".join(message_chunks)
                     message_str = message_bytes.decode("utf-8")
                     try:
+                        LOGGER.debug("Re")
                         message_dict = json.loads(message_str)
                     except json.JSONDecodeError:
                         continue

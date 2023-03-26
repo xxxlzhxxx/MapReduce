@@ -19,6 +19,7 @@ def manager_message_generator(mock_sendall, memory_profiler, tmp_path):
     # Transfer control back to solution under test in between each check for
     # the register message to simulate the Worker calling recv() when there's
     # nothing to receive.
+    
     for _ in utils.wait_for_register_messages(mock_sendall):
         yield None
 
@@ -83,7 +84,7 @@ def test_map_memory(mocker, tmp_path):
     """
     # Mock the socket library socket class
     mock_socket = mocker.patch("socket.socket")
-
+    print('start')
     # sendall() records messages
     mock_sendall = mock_socket.return_value.__enter__.return_value.sendall
 
@@ -106,7 +107,9 @@ def test_map_memory(mocker, tmp_path):
         memory_profiler,
         tmp_path,
     )
+    
 
+    print('here')
     # Run student Worker code.  When student Worker calls recv(), it will
     # return the faked responses configured above.  When the student code calls
     # sys.exit(0), it triggers a SystemExit exception, which we'll catch.
@@ -121,6 +124,9 @@ def test_map_memory(mocker, tmp_path):
     except SystemExit as error:
         assert error.code == 0
 
+    print('okk')
+
+    
     # Verify messages sent by the Worker
     #
     # Pro-tip: show log messages and detailed diffs with
@@ -140,17 +146,18 @@ def test_map_memory(mocker, tmp_path):
             "worker_port": 6001,
         },
     ]
-
+    
     # We expect one subprocess.Popen() call per input file
     assert count_popen_calls.call_count == 4
 
     # Certain process-creating functions should never be called
     utils.check_forbidden_funcs(forbidden_funcs)
 
+    
     # Verify time and memory constraints
     map_time_seconds = memory_profiler.get_time_delta()
     map_memory_bytes = memory_profiler.get_mem_delta()
     LOGGER.info("Map time: %f s", map_time_seconds)
     LOGGER.info("Map memory: %f MB", map_memory_bytes / 1024 / 1024)
-    assert map_memory_bytes < 55 * 1024 * 1024  # 55 MB
+    assert 0 < map_memory_bytes < 55 * 1024 * 1024  # 55 MB
     assert 0 < map_time_seconds < 10
