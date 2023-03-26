@@ -1,9 +1,11 @@
+"""Structures used by the manager."""
 from dataclasses import dataclass
 from typing import Any, Optional, List
 from enum import Enum
 
 class WorkerStatus(Enum):
     """Worker status."""
+
     READY = 1
     BUSY = 2
     DEAD = 3
@@ -11,11 +13,14 @@ class WorkerStatus(Enum):
 @dataclass
 class PartitionInfo:
     """Partition class."""
+
     task_id: int # task id
     files: List[str] # list of files in the partition
 
 @dataclass
 class WorkerInfo:
+    """Worker class."""
+
     host: Any # socket host
     port: Any # socket port
     status: WorkerStatus # worker status

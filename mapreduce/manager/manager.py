@@ -20,6 +20,7 @@ LOGGER = logging.getLogger(__name__)
 
 class Manager:
     """Represent a MapReduce framework Manager node."""
+
     def __init__(self, host, port):
         """Construct a Manager instance and start listening for messages."""
         LOGGER.info(
@@ -56,7 +57,7 @@ class Manager:
         # time.sleep(120)
 
     def tcp_server(self):
-        """create an infinite loop to listen."""
+        """Create an infinite loop to listen."""
         # Create a new TCP socket server
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as self.tcp_socket:
             self.tcp_socket.setsockopt(
@@ -110,6 +111,7 @@ class Manager:
                 time.sleep(0.1)
 
     def udp_server(self):
+        """Create an infinite loop to listen."""
         with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as self.udp_socket:
             self.udp_socket.setsockopt(
                 socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
@@ -142,7 +144,7 @@ class Manager:
                 time.sleep(0.1)
 
     def handle_register(self, message_dict):
-        # handle registration
+        """Handle a register message from a worker."""
         status = WorkerStatus.READY
         # Send an acknowledgement back to the worker
         ack_msg = {
@@ -179,6 +181,7 @@ class Manager:
         )
 
     def handle_shutdown(self):
+        """Handle a shutdown message from a worker."""
         message = {'message_type': 'shutdown'}
         for worker_key, worker in self.workers.items():
             LOGGER.info("Sending shutdown message to worker %s:%d",
@@ -191,6 +194,7 @@ class Manager:
         os._exit(0)
 
     def handle_new_job(self, message_dict):
+        """Handle a new job message from a worker."""
         LOGGER.debug("Add new job: %s", message_dict)
         job = {
             'job_id': self.job_num,
@@ -206,6 +210,7 @@ class Manager:
     
 
     def run_job(self):
+        """Run a job in the job queue."""
         while True:
             if self.job_queue:
                 job = self.job_queue.popleft()
@@ -225,6 +230,7 @@ class Manager:
             time.sleep(0.1)
     
     def handle_mapping(self, job, tmpdir):
+        """Handle mapping phase of a job."""
         #--- build partitions from input files
         files = os.listdir(job['input_directory'])
         sorted_files = sorted(files)
@@ -276,21 +282,9 @@ class Manager:
                                     break
                     time.sleep(0.1)
             time.sleep(0.1)
-            # assert self.finishNum == 0, "BUG: finishNum should be 0 after all tasks are finished"
-            # assert len(self.partitions) == 0, "BUG: partitions should be empty after all tasks are finished"
-            # for worker_key, worker in self.workers.items():
-            #     # all workers should be dead, idle
-            #     if worker.status == WorkerStatus.DEAD:
-            #         continue
-            #     elif worker.status == WorkerStatus.BUSY:
-            #         assert False, "BUG: worker should not be busy after all mapping tasks are finished"
-            #     elif worker.status == WorkerStatus.READY:
-            #         assert worker['job_id'] == None, "BUG: worker should not have job_id after all mapping tasks are finished"
-            #         assert worker['task'] == None, "BUG: worker should not have job_id after all mapping tasks are finished"
-
-
 
     def handle_reduce(self, job, tmpdir):
+        """Handle reduce phase of a job."""
         LOGGER.info("begin Reduce Stage")
         out_dir = job['output_directory']
         all_temp_files = os.listdir(tmpdir)
@@ -357,6 +351,7 @@ class Manager:
         
 
     def handle_finished(self, message_dict):
+        """Handle a finished task message."""
         self.finishNum -= 1
         for worker_key, worker in self.workers.items():
             if worker.task.task_id == message_dict['task_id']:

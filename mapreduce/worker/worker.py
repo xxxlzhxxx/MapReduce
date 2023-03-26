@@ -59,7 +59,6 @@ class Worker:
 
     def udp_send(self):
         """Use UDP to send heartbeat every two second."""
-     
         with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as self.udp_socket:
             # Connect to the UDP socket on server
             self.udp_socket.connect((self.manager_host, self.manager_port))
@@ -77,7 +76,7 @@ class Worker:
                 time.sleep(2)
 
     def tcp_server(self):
-        """create an infinite loop to listen."""
+        """Create an infinite loop to listen."""
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as self.tcp_socket:
             self.tcp_socket.setsockopt(
                 socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
@@ -140,6 +139,7 @@ class Worker:
             sock.sendall(json.dumps(message).encode('utf-8'))
     
     def handle_mapping(self, message_dict):
+        """Handle mapping task."""
         executable = message_dict['executable']
         prefix = f"mapreduce-local-task{message_dict['task_id']:05}-"
         with tempfile.TemporaryDirectory(prefix=prefix) as tmpdir:
@@ -184,6 +184,7 @@ class Worker:
             sock.sendall(json.dumps(message).encode('utf-8'))
 
     def handle_reducing(self, message_dict):
+        """Handle reducing task."""
         LOGGER.debug(f"received\n{message_dict}")
         executable = message_dict['executable']
         prefix = f"mapreduce-local-task{message_dict['task_id']:05}-"
