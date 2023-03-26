@@ -148,9 +148,9 @@ class Worker:
 
     def handle_mapping(self, message_dict):
         """Handle mapping task."""
-        with tempfile.TemporaryDirectory(
-            prefix=f"mapreduce-local-task{message_dict['task_id']:05}-"
-            ) as tmpdir:
+        prefix = f"mapreduce-local-task{message_dict['task_id']:05}-"
+        executable = message_dict["executable"]
+        with tempfile.TemporaryDirectory(prefix=prefix) as tmpdir:
             for input_path in message_dict["input_paths"]:
                 LOGGER.info("Created %s", tmpdir)
                 with open(input_path, encoding="utf8") as infile:
@@ -161,16 +161,12 @@ class Worker:
                         text=True,
                     ) as map_process:
                         LOGGER.info(
-                            "Executed %s input=%s", message_dict["executable"], input_path
+                            "Executed %s input=%s", executable, input_path
                         )
                         for line in map_process.stdout:
                             key, _ = line.split("\t")
-                            hexdigest = hashlib.md5(
-                                key.encode("utf-8")
-                            ).hexdigest()
-                            keyhash = int(hexdigest, base=16)
-                            partition_number = (
-                                keyhash % message_dict["num_partitions"]
+                            partition_number = self.calculate_partition(
+                                key, message_dict["num_partitions"]
                             )
                             intermediate_file = os.path.join(
                                 tmpdir,
@@ -192,29 +188,28 @@ class Worker:
             }
             sock.sendall(json.dumps(message).encode("utf-8"))
 
+    def calculate_partition(self, key, num_partitions):
+        """Calculate partition number."""
+        hexdigest = hashlib.md5(key.encode("utf-8")).hexdigest()
+        keyhash = int(hexdigest, base=16)
+        return keyhash % num_partitions
 
     def handle_sorting(self, tmpdir, message_dict):
         """Handle sorting task."""
         with ExitStack() as stack:
-        # Open all input and output files at the same time
-            input_files = [stack.enter_context(
-                            open(os.path.join(tmpdir, file), "r", encoding="utf8")
-                            )
-                           for file in os.listdir(tmpdir)
-                        ]
-            output_files = [
-                stack.enter_context(
-                    open(os.path.join(message_dict["output_directory"], file), "w", encoding="utf8")
-                    )
-                    for file in os.listdir(tmpdir)
-                ]
-
-            # Read and sort lines from input files, and write them to output files
-            for i, input_file in enumerate(input_files):
+            # Open all input and output files at the same time
+            inf = []
+            ouf = []
+            for file in os.listdir(tmpdir):
+                path = os.path.join(tmpdir, file)
+                in_put = stack.enter_context(open(path, "r", encoding="utf8"))
+                inf.append(in_put)
+                path = os.path.join(message_dict["output_directory"], file)
+                output = stack.enter_context(open(path, "w", encoding="utf8"))
+                ouf.append(output)
+            for i, input_file in enumerate(inf):
                 sorted_lines = sorted(input_file.readlines())
-                output_files[i].writelines(sorted_lines)
-                LOGGER.info("Sorted %s", os.path.join(tmpdir, os.listdir(tmpdir)[i]))
-
+                ouf[i].writelines(sorted_lines)
 
     def handle_reducing(self, message_dict):
         """Handle reducing task."""

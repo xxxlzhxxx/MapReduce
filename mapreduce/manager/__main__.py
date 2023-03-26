@@ -17,9 +17,9 @@ def main(host, port, logfile, loglevel, shared_dir):
     """Run Manager."""
     tempfile.tempdir = shared_dir
     if not logfile:
-        handler = logging.FileHandler()
+        handler = logging.StreamHandler()
     else:
-        handler = logging.StreamHandler(logfile)
+        handler = logging.FileHandler(logfile)
     formatter = logging.Formatter(
         f"Manager:{port} [%(levelname)s] %(message)s"
     )

@@ -268,17 +268,22 @@ class Manager:
                 LOGGER.info("Cleaned up tmpdir %s", tmpdir)
             time.sleep(0.1)
 
-    def handle_mapping(self, job, tmpdir):
-        """Handle mapping phase of a job."""
-        # --- build partitions from input files
-        file_partitions = [[] for i in range(job["num_mappers"])]
-        for i, this_file in enumerate(sorted(os.listdir(job["input_directory"]))):
-            file_partitions[i % job["num_mappers"]].append(this_file)
-
+    def handle_part(self, file_partitions):
+        """Handle a part message from a worker."""
         for task_id, partition_files in enumerate(file_partitions):
             part = PartitionInfo(task_id=task_id, files=partition_files)
             self.partitions.append(part)
             self.finish_num += 1
+
+    def handle_mapping(self, job, tmpdir):
+        """Handle mapping phase of a job."""
+        # --- build partitions from input files
+        file_partitions = [[] for i in range(job["num_mappers"])]
+        input_dir = job["input_directory"]
+        for i, this_file in enumerate(sorted(os.listdir(input_dir))):
+            file_partitions[i % job["num_mappers"]].append(this_file)
+
+        self.handle_part(file_partitions)
 
         while self.finish_num:
             # loop until all tasks are finished
@@ -286,7 +291,7 @@ class Manager:
                 # if there are still partitions(works) to be assigned
                 part = self.partitions.popleft()
                 input_path = [
-                    os.path.join(job["input_directory"], filename)
+                    os.path.join(input_dir, filename)
                     for filename in part.files
                 ]
                 assigned = False
