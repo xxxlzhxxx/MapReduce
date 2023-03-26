@@ -172,13 +172,15 @@ class Worker:
                                     key, message_dict["num_partitions"])
                                 intermediate_file = os.path.join(
                                     tmpdir,
-                                    f"maptask{message_dict['task_id']:05}-part{partition_number:05}",
+                                    (f"maptask{message_dict['task_id']:05}"
+                                     f"-part{partition_number:05}"),
                                 )
 
-                                # Open the file if it's not already opened and store the file object in the dictionary
+                                # Open the file if it's not already opened
                                 if intermediate_file not in file_objects:
                                     file_objects[intermediate_file] = stack.enter_context(
-                                        open(intermediate_file, "a", encoding="utf8")
+                                        open(intermediate_file,
+                                             "a", encoding="utf8")
                                     )
                                 file_objects[intermediate_file].write(line)
                         # LOGGER.debug("writing done")
@@ -204,8 +206,11 @@ class Worker:
         """Handle sorting task."""
         LOGGER.info("Sorting %s", tmpdir)
         with ExitStack() as stack:
-            inf = [stack.enter_context(open(os.path.join(tmpdir, file), "r", encoding="utf8")) for file in os.listdir(tmpdir)]
-            ouf = [stack.enter_context(open(os.path.join(message_dict["output_directory"], file), "w", encoding="utf8")) for file in os.listdir(tmpdir)]
+            inf = [stack.enter_context(open(os.path.join(
+                tmpdir, file), "r", encoding="utf8")) for file in os.listdir(tmpdir)]
+            ouf = [stack.enter_context(open(os.path.join(
+                message_dict["output_directory"], file), "w", encoding="utf8"))
+                for file in os.listdir(tmpdir)]
             for i, input_file in enumerate(inf):
                 sorted_lines = sorted(input_file.readlines())
                 ouf[i].writelines(sorted_lines)
