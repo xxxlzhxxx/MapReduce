@@ -148,20 +148,20 @@ class Worker:
 
     def handle_mapping(self, message_dict):
         """Handle mapping task."""
-        executable = message_dict["executable"]
-        prefix = f"mapreduce-local-task{message_dict['task_id']:05}-"
-        with tempfile.TemporaryDirectory(prefix=prefix) as tmpdir:
+        with tempfile.TemporaryDirectory(
+            prefix=f"mapreduce-local-task{message_dict['task_id']:05}-"
+            ) as tmpdir:
             for input_path in message_dict["input_paths"]:
                 LOGGER.info("Created %s", tmpdir)
                 with open(input_path, encoding="utf8") as infile:
                     with subprocess.Popen(
-                        [executable],
+                        [message_dict["executable"]],
                         stdin=infile,
                         stdout=subprocess.PIPE,
                         text=True,
                     ) as map_process:
                         LOGGER.info(
-                            "Executed %s input=%s", executable, input_path
+                            "Executed %s input=%s", message_dict["executable"], input_path
                         )
                         for line in map_process.stdout:
                             key, _ = line.split("\t")
@@ -180,21 +180,7 @@ class Worker:
                             with open(intermediate_file, "a",
                                       encoding="utf8") as this_file:
                                 this_file.write(line)
-            for file in os.listdir(tmpdir):
-                with open(os.path.join(tmpdir, file), "r",
-                          encoding="utf8") as this_file:
-                    sorted_line = sorted(this_file.readlines())
-                with open(os.path.join(tmpdir, file), "w",
-                          encoding="utf8") as this_file:
-                    this_file.writelines(sorted_line)
-                LOGGER.info("Sorted %s", os.path.join(tmpdir, file))
-            for file in os.listdir(tmpdir):
-                old_path = os.path.join(tmpdir, file)
-                output_path = os.path.join(
-                    message_dict["output_directory"], file
-                )
-                shutil.move(old_path, output_path)
-                LOGGER.info("Moved %s -> %s", old_path, output_path)
+            self.handle_sorting(tmpdir, message_dict)
         LOGGER.info("Removed %s", tmpdir)
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
             sock.connect((self.manager_host, self.manager_port))
@@ -205,6 +191,30 @@ class Worker:
                 "worker_port": self.port,
             }
             sock.sendall(json.dumps(message).encode("utf-8"))
+
+
+    def handle_sorting(self, tmpdir, message_dict):
+        """Handle sorting task."""
+        with ExitStack() as stack:
+        # Open all input and output files at the same time
+            input_files = [stack.enter_context(
+                            open(os.path.join(tmpdir, file), "r", encoding="utf8")
+                            )
+                           for file in os.listdir(tmpdir)
+                        ]
+            output_files = [
+                stack.enter_context(
+                    open(os.path.join(message_dict["output_directory"], file), "w", encoding="utf8")
+                    )
+                    for file in os.listdir(tmpdir)
+                ]
+
+            # Read and sort lines from input files, and write them to output files
+            for i, input_file in enumerate(input_files):
+                sorted_lines = sorted(input_file.readlines())
+                output_files[i].writelines(sorted_lines)
+                LOGGER.info("Sorted %s", os.path.join(tmpdir, os.listdir(tmpdir)[i]))
+
 
     def handle_reducing(self, message_dict):
         """Handle reducing task."""
