@@ -149,7 +149,7 @@ class Worker:
     def handle_mapping(self, message_dict):
         """Handle mapping task."""
         prefix = f"mapreduce-local-task{message_dict['task_id']:05}-"
-        executable = message_dict["executable"]
+        # executable = message_dict["executable"]
         with tempfile.TemporaryDirectory(prefix=prefix) as tmpdir:
             for input_path in message_dict["input_paths"]:
                 LOGGER.info("Created %s", tmpdir)
@@ -161,7 +161,8 @@ class Worker:
                         text=True,
                     ) as map_process:
                         LOGGER.info(
-                            "Executed %s input=%s", executable, input_path
+                            "Executed %s input=%s",
+                            message_dict["executable"], input_path
                         )
                         # LOGGER.debug("writing to temp")
                         with ExitStack() as stack:
