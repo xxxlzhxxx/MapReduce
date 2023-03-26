@@ -5,7 +5,7 @@ import tempfile
 import click
 
 from mapreduce.manager.manager import Manager
-LOGGER = logging.getLogger(__name__)
+
 
 @click.command()
 @click.option("--host", "host", default="localhost")
@@ -17,7 +17,6 @@ def main(host, port, logfile, loglevel, shared_dir):
     """Run Manager."""
     tempfile.tempdir = shared_dir
     if logfile:
-        LOGGER.debug("Re")
         handler = logging.FileHandler(logfile)
     else:
         handler = logging.StreamHandler()
