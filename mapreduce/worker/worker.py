@@ -94,7 +94,7 @@ class Worker:
             self.register()
             while True:
                 try:
-                    conn, addr = tcp_socket.accept()
+                    conn, _ = tcp_socket.accept()
                 except socket.timeout:
 
                     continue
@@ -152,7 +152,7 @@ class Worker:
         with tempfile.TemporaryDirectory(prefix=prefix) as tmpdir:
             for input_path in message_dict["input_paths"]:
                 LOGGER.info("Created %s", tmpdir)
-                with open(input_path) as infile:
+                with open(input_path, encoding="utf8") as infile:
                     with subprocess.Popen(
                         [executable],
                         stdin=infile,
@@ -176,7 +176,8 @@ class Worker:
                                 f"maptask{message_dict['task_id']:05}"
                                 + f"-part{partition_number:05}",
                             )
-                            with open(intermediate_file, "a") as this_file:
+                            with open(intermediate_file, "a",
+                                      encoding="utf8") as this_file:
                                 this_file.write(line)
             for file in os.listdir(tmpdir):
                 with open(os.path.join(tmpdir, file), "r") as this_file:
@@ -213,7 +214,8 @@ class Worker:
             for f in message_dict["input_paths"]:
                 prev_temp_files.append(pathlib.Path(f).resolve())
             # Merge map files
-            input_streams = [open(f, "r") for f in prev_temp_files]
+            input_streams = [open(f, "r", encoding="utf8")
+                             for f in prev_temp_files]
             merged_stream = heapq.merge(*input_streams)
 
             # Run reduce executable
@@ -221,7 +223,7 @@ class Worker:
             output_file = os.path.join(
                 tmpdir, f"part{message_dict['task_id']:05}"
             )
-            with open(output_file, "w") as outfile:
+            with open(output_file, "w", encoding="utf8") as outfile:
                 with subprocess.Popen(
                     [executable],
                     stdin=subprocess.PIPE,
