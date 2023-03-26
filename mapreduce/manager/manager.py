@@ -52,63 +52,76 @@ class Manager:
         udp_thread.join()
         job_thread.join()
 
+    #def getconn(self, tcpskt):
+
+
+    def getmessage(self, tcpskt):
+        """get message."""
+        while True:
+            # Accept a connection from a worker
+            try:
+                conn, _ = tcpskt.accept()
+            except socket.timeout:
+                continue
+            conn.settimeout(1)
+            print('cao')
+            with conn:
+                print('sb pylint')
+                message_chunks = []
+                while True:
+                    try:
+                        data = conn.recv(4096)
+                        print(data)
+                    except socket.timeout:
+                        print('cao')
+                        continue
+                    if not data:
+                        print('cnm')
+                        break
+                    message_chunks.append(data)
+                print('cao')
+                message_bytes = b"".join(message_chunks)
+                message_str = message_bytes.decode("utf-8")
+                try:
+                    print('cao')
+                    message_dict = json.loads(message_str)
+                except json.JSONDecodeError:
+                    continue
+
+                LOGGER.debug("Received message: %s", message_dict)
+
+                # Add the worker to the list of registered workers
+                if message_dict["message_type"] == "register":
+                    self.handle_register(message_dict)
+
+                # receive shutdown message,
+                # send shut down message to every worker
+                elif message_dict["message_type"] == "shutdown":
+                    self.handle_shutdown()
+
+                # manager handle new job
+                elif message_dict["message_type"] == "new_manager_job":
+                    self.handle_new_job(message_dict)
+
+                elif message_dict["message_type"] == "finished":
+                    self.handle_finished(message_dict)
+            # handle busy waiting
+            time.sleep(0.1)
+
     def tcp_server(self):
         """Create an infinite loop to listen."""
         # Create a new TCP socket server
         with socket.socket(
             socket.AF_INET, socket.SOCK_STREAM
-        ) as tcp_socket:
-            tcp_socket.setsockopt(
+        ) as tcpskt:
+            tcpskt.setsockopt(
                 socket.SOL_SOCKET, socket.SO_REUSEADDR, 1
             )
-            tcp_socket.bind((self.host, self.port))
-            tcp_socket.listen()
-            tcp_socket.settimeout(1)
-            while True:
-                # Accept a connection from a worker
-                try:
-                    conn, _ = tcp_socket.accept()
-                except socket.timeout:
-                    continue
-                conn.settimeout(1)
-                with conn:
-                    message_chunks = []
-                    while True:
-                        try:
-                            data = conn.recv(4096)
-                            # print(data)
-                        except socket.timeout:
-                            continue
-                        if not data:
-                            break
-                        message_chunks.append(data)
+            tcpskt.bind((self.host, self.port))
+            tcpskt.listen()
+            tcpskt.settimeout(1)
+            self.getmessage(tcpskt)
 
-                    message_bytes = b"".join(message_chunks)
-                    message_str = message_bytes.decode("utf-8")
-                    try:
-                        message_dict = json.loads(message_str)
-                    except json.JSONDecodeError:
-                        continue
-
-                    LOGGER.debug("Received message: %s", message_dict)
-
-                    # Add the worker to the list of registered workers
-                    if message_dict["message_type"] == "register":
-                        self.handle_register(message_dict)
-
-                    # receive shutdown message,
-                    # send shut down message to every worker
-                    elif message_dict["message_type"] == "shutdown":
-                        self.handle_shutdown()
-
-                    # manager handle new job
-                    elif message_dict["message_type"] == "new_manager_job":
-                        self.handle_new_job(message_dict)
-
-                    elif message_dict["message_type"] == "finished":
-                        self.handle_finished(message_dict)
-                # handle busy waiting
-                time.sleep(0.1)
 
     def udp_server(self):
         """Create an infinite loop to listen."""
