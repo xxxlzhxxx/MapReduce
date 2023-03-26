@@ -71,6 +71,8 @@ def worker_message_generator(mock_sendall, tmp_path):
     for _ in utils.wait_for_map_messages(mock_sendall, num=2):
         yield None
 
+
+    
     # Status finished message from second map task
     yield json.dumps({
         "message_type": "finished",
