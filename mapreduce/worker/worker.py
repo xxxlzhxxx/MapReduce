@@ -208,9 +208,10 @@ class Worker:
     def handle_reducing(self, message_dict):
         """Handle reducing task."""
         # LOGGER.debug(f"received\n{message_dict}")
-        executable = message_dict["executable"]
-        prefix = f"mapreduce-local-task{message_dict['task_id']:05}-"
-        with tempfile.TemporaryDirectory(prefix=prefix) as tmpdir:
+        with tempfile.TemporaryDirectory(
+            prefix="mapreduce-local-task"
+            + f"{message_dict['task_id']:05}-")\
+                as tmpdir:
             # LOGGER.debug(f"Created {tmpdir}")
             prev_temp_files = []
             for this_file in message_dict["input_paths"]:
@@ -227,7 +228,7 @@ class Worker:
             )
             with open(output_file, "w", encoding="utf8") as outfile:
                 with subprocess.Popen(
-                    [executable],
+                    [message_dict["executable"]],
                     stdin=subprocess.PIPE,
                     stdout=outfile,
                     text=True,
@@ -241,9 +242,9 @@ class Worker:
 
             # Move the output file to the
             # final output directory specified by the Manager
-            task_id = message_dict["task_id"]
             final_output_path = os.path.join(
-                message_dict["output_directory"], f"part-{task_id:05}"
+                message_dict["output_directory"],
+                f"part-{message_dict['task_id']:05}"
             )
             # LOGGER.debug(f"Moved {output_file} -> {final_output_path}")
             shutil.move(output_file, final_output_path)
