@@ -11,6 +11,7 @@ import subprocess
 import tempfile
 import threading
 import time
+from contextlib import ExitStack
 
 LOGGER = logging.getLogger(__name__)
 
@@ -217,37 +218,40 @@ class Worker:
             for this_file in message_dict["input_paths"]:
                 prev_temp_files.append(pathlib.Path(this_file).resolve())
             # Merge map files
-            input_streams = [open(this_file, "r", encoding="utf8")
-                             for this_file in prev_temp_files]
-            merged_stream = heapq.merge(*input_streams)
+            with ExitStack() as stack:
+                # input_streams = [open(this_file, "r", encoding="utf8")
+                #                 for this_file in prev_temp_files]
+                input_streams = [
+                    stack.enter_context(
+                        open(this_file, "r", encoding="utf8"))
+                    for this_file in prev_temp_files]
+                merged_stream = heapq.merge(*input_streams)
 
-            # Run reduce executable
-            # LOGGER.debug(f"Executed {executable}")
-            output_file = os.path.join(
-                tmpdir, f"part{message_dict['task_id']:05}"
-            )
-            with open(output_file, "w", encoding="utf8") as outfile:
-                with subprocess.Popen(
-                    [message_dict["executable"]],
-                    stdin=subprocess.PIPE,
-                    stdout=outfile,
-                    text=True,
-                ) as reduce_process:
-                    for line in merged_stream:
-                        reduce_process.stdin.write(line)
+                # Run reduce executable
+                # LOGGER.debug(f"Executed {executable}")
+                output_file = os.path.join(
+                    tmpdir, f"part{message_dict['task_id']:05}"
+                )
+                with open(output_file, "w", encoding="utf8") as outfile:
+                    with subprocess.Popen(
+                        [message_dict["executable"]],
+                        stdin=subprocess.PIPE,
+                        stdout=outfile,
+                        text=True,
+                    ) as reduce_process:
+                        for line in merged_stream:
+                            reduce_process.stdin.write(line)
 
-            # Close input_streams
-            for stream in input_streams:
-                stream.close()
+                # Close input_streams
+                for stream in input_streams:
+                    stream.close()
 
             # Move the output file to the
-            # final output directory specified by the Manager
-            final_output_path = os.path.join(
+            # LOGGER.debug(f"Moved {output_file} -> {final_output_path}")
+            shutil.move(output_file, os.path.join(
                 message_dict["output_directory"],
                 f"part-{message_dict['task_id']:05}"
-            )
-            # LOGGER.debug(f"Moved {output_file} -> {final_output_path}")
-            shutil.move(output_file, final_output_path)
+            ))
 
         # Remove the temporary directory
         # LOGGER.debug(f"Removed {tmpdir}")

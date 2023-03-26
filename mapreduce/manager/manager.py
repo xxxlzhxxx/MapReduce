@@ -30,8 +30,7 @@ class Manager:
 
         # begin ---------------------------------------------------------
         # create an array to store all the info of workers
-        self.port = port
-        self.host = host
+        self.address = (host, port)
         self.finish_num = 0
         self.workers: Dict[Tuple[Any, Any], WorkerInfo] = {}
         # (host, port) -> WorkerInfo
@@ -39,7 +38,6 @@ class Manager:
         self.task_queue = collections.deque()
         self.job_num = 0
         self.partitions = collections.deque()  # store all the Partition
-        self.running = False
 
         tcp_thread = threading.Thread(target=self.tcp_server)
         tcp_thread.start()
@@ -131,7 +129,7 @@ class Manager:
             udp_socket.setsockopt(
                 socket.SOL_SOCKET, socket.SO_REUSEADDR, 1
             )
-            udp_socket.bind((self.host, self.port))
+            udp_socket.bind(self.address)
             udp_socket.settimeout(1)
 
             while True:
