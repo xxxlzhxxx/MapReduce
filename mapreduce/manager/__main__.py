@@ -20,6 +20,7 @@ def main(host, port, logfile, loglevel, shared_dir):
         LOGGER.debug('ccc')
         handler = logging.FileHandler(logfile)
     else:
+        print('sb pylint')
         handler = logging.StreamHandler()
     formatter = logging.Formatter(
         f"Manager:{port} [%(levelname)s] %(message)s"

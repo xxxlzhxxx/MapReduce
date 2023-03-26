@@ -70,7 +70,9 @@ class Manager:
                     conn, _ = ttt.accept()
                     LOGGER.debug('ccc')
                 except socket.timeout:
+                    print('sb pylint')
                     continue
+                print('sb pylint')
                 conn.settimeout(1)
                 with conn:
                     LOGGER.debug('ccc')
@@ -79,6 +81,7 @@ class Manager:
                         try:
                             LOGGER.debug('ccc')
                             data = conn.recv(4096)
+                            print(data)
                             # print(data)
                             LOGGER.debug('ccc')
                         except socket.timeout:
