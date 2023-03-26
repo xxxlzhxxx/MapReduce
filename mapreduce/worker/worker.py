@@ -163,7 +163,7 @@ class Worker:
                             "Executed %s input=%s", executable, input_path
                         )
                         for line in map_process.stdout:
-                            key, value = line.split("\t")
+                            key, _ = line.split("\t")
                             hexdigest = hashlib.md5(
                                 key.encode("utf-8")
                             ).hexdigest()
@@ -180,9 +180,11 @@ class Worker:
                                       encoding="utf8") as this_file:
                                 this_file.write(line)
             for file in os.listdir(tmpdir):
-                with open(os.path.join(tmpdir, file), "r") as this_file:
+                with open(os.path.join(tmpdir, file), "r",
+                          encoding="utf8") as this_file:
                     sorted_line = sorted(this_file.readlines())
-                with open(os.path.join(tmpdir, file), "w") as this_file:
+                with open(os.path.join(tmpdir, file), "w",
+                          encoding="utf8") as this_file:
                     this_file.writelines(sorted_line)
                 LOGGER.info("Sorted %s", os.path.join(tmpdir, file))
             for file in os.listdir(tmpdir):
@@ -205,17 +207,17 @@ class Worker:
 
     def handle_reducing(self, message_dict):
         """Handle reducing task."""
-        LOGGER.debug(f"received\n{message_dict}")
+        # LOGGER.debug(f"received\n{message_dict}")
         executable = message_dict["executable"]
         prefix = f"mapreduce-local-task{message_dict['task_id']:05}-"
         with tempfile.TemporaryDirectory(prefix=prefix) as tmpdir:
             # LOGGER.debug(f"Created {tmpdir}")
             prev_temp_files = []
-            for f in message_dict["input_paths"]:
-                prev_temp_files.append(pathlib.Path(f).resolve())
+            for this_file in message_dict["input_paths"]:
+                prev_temp_files.append(pathlib.Path(this_file).resolve())
             # Merge map files
-            input_streams = [open(f, "r", encoding="utf8")
-                             for f in prev_temp_files]
+            input_streams = [open(this_file, "r", encoding="utf8")
+                             for this_file in prev_temp_files]
             merged_stream = heapq.merge(*input_streams)
 
             # Run reduce executable
