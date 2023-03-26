@@ -61,9 +61,9 @@ class Worker:
         """Use UDP to send heartbeat every two second."""
         with socket.socket(
             socket.AF_INET, socket.SOCK_DGRAM
-        ) as self.udp_socket:
+        ) as udp_socket:
             # Connect to the UDP socket on server
-            self.udp_socket.connect((self.manager_host, self.manager_port))
+            udp_socket.connect((self.manager_host, self.manager_port))
             # Send heatbeat
             message = json.dumps(
                 {
@@ -76,25 +76,25 @@ class Worker:
                 if not self.start:
                     time.sleep(0.5)
                     continue
-                self.udp_socket.sendall(message.encode("utf-8"))
+                udp_socket.sendall(message.encode("utf-8"))
                 time.sleep(2)
 
     def tcp_server(self):
         """Create an infinite loop to listen."""
         with socket.socket(
             socket.AF_INET, socket.SOCK_STREAM
-        ) as self.tcp_socket:
-            self.tcp_socket.setsockopt(
+        ) as tcp_socket:
+            tcp_socket.setsockopt(
                 socket.SOL_SOCKET, socket.SO_REUSEADDR, 1
             )
-            self.tcp_socket.bind((self.host, self.port))
-            self.tcp_socket.listen()
-            self.tcp_socket.settimeout(1)
+            tcp_socket.bind((self.host, self.port))
+            tcp_socket.listen()
+            tcp_socket.settimeout(1)
 
             self.register()
             while True:
                 try:
-                    conn, addr = self.tcp_socket.accept()
+                    conn, addr = tcp_socket.accept()
                 except socket.timeout:
 
                     continue
@@ -176,13 +176,13 @@ class Worker:
                                 f"maptask{message_dict['task_id']:05}"
                                 + f"-part{partition_number:05}",
                             )
-                            with open(intermediate_file, "a") as f:
-                                f.write(line)
+                            with open(intermediate_file, "a") as this_file:
+                                this_file.write(line)
             for file in os.listdir(tmpdir):
-                with open(os.path.join(tmpdir, file), "r") as f:
-                    sorted_line = sorted(f.readlines())
-                with open(os.path.join(tmpdir, file), "w") as f:
-                    f.writelines(sorted_line)
+                with open(os.path.join(tmpdir, file), "r") as this_file:
+                    sorted_line = sorted(this_file.readlines())
+                with open(os.path.join(tmpdir, file), "w") as this_file:
+                    this_file.writelines(sorted_line)
                 LOGGER.info("Sorted %s", os.path.join(tmpdir, file))
             for file in os.listdir(tmpdir):
                 old_path = os.path.join(tmpdir, file)
@@ -208,7 +208,7 @@ class Worker:
         executable = message_dict["executable"]
         prefix = f"mapreduce-local-task{message_dict['task_id']:05}-"
         with tempfile.TemporaryDirectory(prefix=prefix) as tmpdir:
-            LOGGER.debug(f"Created {tmpdir}")
+            # LOGGER.debug(f"Created {tmpdir}")
             prev_temp_files = []
             for f in message_dict["input_paths"]:
                 prev_temp_files.append(pathlib.Path(f).resolve())
@@ -217,7 +217,7 @@ class Worker:
             merged_stream = heapq.merge(*input_streams)
 
             # Run reduce executable
-            LOGGER.debug(f"Executed {executable}")
+            # LOGGER.debug(f"Executed {executable}")
             output_file = os.path.join(
                 tmpdir, f"part{message_dict['task_id']:05}"
             )
@@ -241,11 +241,11 @@ class Worker:
             final_output_path = os.path.join(
                 message_dict["output_directory"], f"part-{task_id:05}"
             )
-            LOGGER.debug(f"Moved {output_file} -> {final_output_path}")
+            # LOGGER.debug(f"Moved {output_file} -> {final_output_path}")
             shutil.move(output_file, final_output_path)
 
         # Remove the temporary directory
-        LOGGER.debug(f"Removed {tmpdir}")
+        # LOGGER.debug(f"Removed {tmpdir}")
 
         # Send a finished message to the Manager
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:

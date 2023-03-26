@@ -3,16 +3,12 @@ import collections
 import json
 import logging
 import os
-import pathlib
 import socket
 import tempfile
 import threading
 import time
-from typing import Any, Dict, List, Tuple
+from typing import Any, Dict, Tuple
 
-import click
-
-import mapreduce.utils
 from mapreduce.manager.structures import (PartitionInfo, WorkerInfo,
                                           WorkerStatus)
 
@@ -61,17 +57,17 @@ class Manager:
         # Create a new TCP socket server
         with socket.socket(
             socket.AF_INET, socket.SOCK_STREAM
-        ) as self.tcp_socket:
-            self.tcp_socket.setsockopt(
+        ) as tcp_socket:
+            tcp_socket.setsockopt(
                 socket.SOL_SOCKET, socket.SO_REUSEADDR, 1
             )
-            self.tcp_socket.bind((self.host, self.port))
-            self.tcp_socket.listen()
-            self.tcp_socket.settimeout(1)
+            tcp_socket.bind((self.host, self.port))
+            tcp_socket.listen()
+            tcp_socket.settimeout(1)
             while True:
                 # Accept a connection from a worker
                 try:
-                    conn, _ = self.tcp_socket.accept()
+                    conn, _ = tcp_socket.accept()
                 except socket.timeout:
                     continue
                 conn.settimeout(1)
@@ -118,16 +114,16 @@ class Manager:
         """Create an infinite loop to listen."""
         with socket.socket(
             socket.AF_INET, socket.SOCK_DGRAM
-        ) as self.udp_socket:
-            self.udp_socket.setsockopt(
+        ) as udp_socket:
+            udp_socket.setsockopt(
                 socket.SOL_SOCKET, socket.SO_REUSEADDR, 1
             )
-            self.udp_socket.bind((self.host, self.port))
-            self.udp_socket.settimeout(1)
+            udp_socket.bind((self.host, self.port))
+            udp_socket.settimeout(1)
 
             while True:
                 try:
-                    message_bytes = self.udp_socket.recv(4096)
+                    message_bytes = udp_socket.recv(4096)
                 except socket.timeout:
                     continue
                 message_str = message_bytes.decode("utf-8")
@@ -220,7 +216,7 @@ class Manager:
     def handle_shutdown(self):
         """Handle a shutdown message from a worker."""
         message = {"message_type": "shutdown"}
-        for worker_key, worker in self.workers.items():
+        for _, worker in self.workers.items():
             LOGGER.info(
                 "Sending shutdown message to worker %s:%d",
                 worker.host,
@@ -402,7 +398,7 @@ class Manager:
     def handle_finished(self, message_dict):
         """Handle a finished task message."""
         self.finish_num -= 1
-        for worker_key, worker in self.workers.items():
+        for _, worker in self.workers.items():
             if worker.task.task_id == message_dict["task_id"]:
                 print(111111)
                 worker.status = WorkerStatus.READY

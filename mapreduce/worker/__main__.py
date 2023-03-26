@@ -1,6 +1,6 @@
 """MapReduce framework Worker node."""
-import click
 import logging
+import click
 from mapreduce.worker.worker import Worker
 
 
