@@ -1,17 +1,9 @@
 """MapReduce framework Manager node."""
-import os
-import tempfile
 import logging
-import json
-import time
-import click
-import pathlib
-import mapreduce.utils
-import threading
-import socket
-import collections
 import tempfile
-from dataclasses import dataclass
+
+import click
+
 from mapreduce.manager.manager import Manager
 
 
@@ -36,6 +28,7 @@ def main(host, port, logfile, loglevel, shared_dir):
     root_logger.addHandler(handler)
     root_logger.setLevel(loglevel.upper())
     Manager(host, port)
+
 
 if __name__ == "__main__":
     main()

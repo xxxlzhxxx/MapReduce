@@ -1,6 +1,6 @@
 """MapReduce framework Worker node."""
-import click
 import logging
+import click
 from mapreduce.worker.worker import Worker
 
 
@@ -17,12 +17,15 @@ def main(host, port, manager_host, manager_port, logfile, loglevel):
         handler = logging.FileHandler(logfile)
     else:
         handler = logging.StreamHandler()
-    formatter = logging.Formatter(f"Worker:{port} [%(levelname)s] %(message)s")
+    formatter = logging.Formatter(
+        f"Worker:{port} [%(levelname)s] %(message)s"
+    )
     handler.setFormatter(formatter)
     root_logger = logging.getLogger()
     root_logger.addHandler(handler)
     root_logger.setLevel(loglevel.upper())
     Worker(host, port, manager_host, manager_port)
+
 
 if __name__ == "__main__":
     main()
