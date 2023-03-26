@@ -55,48 +55,43 @@ class Manager:
         # Create a new TCP socket server
         with socket.socket(
             socket.AF_INET, socket.SOCK_STREAM
-        ) as ttt:
-            ttt.setsockopt(
+        ) as skt:
+            skt.setsockopt(
                 socket.SOL_SOCKET, socket.SO_REUSEADDR, 1
             )
-            LOGGER.debug('ccc')
-            ttt.bind(self.address)
-            ttt.listen()
-            LOGGER.debug('ccc')
-            ttt.settimeout(1)
+            skt.bind(self.address)
+            LOGGER.debug("Re")
+            skt.listen()
+            skt.settimeout(1)
             while True:
                 # Accept a connection from a worker
                 try:
-                    conn, _ = ttt.accept()
-                    LOGGER.debug('ccc')
+                    conn, _ = skt.accept()
+                    LOGGER.debug("Re")
                 except socket.timeout:
-                    print('sb pylint')
                     continue
-                print('sb pylint')
                 conn.settimeout(1)
                 with conn:
-                    LOGGER.debug('ccc')
+                    LOGGER.debug("Re")
                     message_chunks = []
                     while True:
                         try:
-                            LOGGER.debug('ccc')
+                            LOGGER.debug("Re")
                             data = conn.recv(4096)
-                            print(data)
+                            LOGGER.debug("Re")
                             # print(data)
-                            LOGGER.debug('ccc')
                         except socket.timeout:
                             continue
                         if not data:
-                            LOGGER.debug('ccc')
+                            LOGGER.debug("Re")
                             break
                         message_chunks.append(data)
-
+                    LOGGER.debug("Re")
                     message_bytes = b"".join(message_chunks)
-                    LOGGER.debug('ccc')
                     message_str = message_bytes.decode("utf-8")
                     try:
+                        LOGGER.debug("Re")
                         message_dict = json.loads(message_str)
-                        LOGGER.debug('ccc')
                     except json.JSONDecodeError:
                         continue
 
