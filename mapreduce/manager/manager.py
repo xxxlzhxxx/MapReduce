@@ -1,22 +1,20 @@
 """MapReduce framework Manager node."""
-import os
-import tempfile
-import logging
-import json
-import time
-import click
-import pathlib
-import mapreduce.utils
-import threading
-import socket
 import collections
+import json
+import logging
+import os
+import pathlib
+import socket
 import tempfile
+import threading
+import time
 from typing import Any, Dict, List, Tuple
-from mapreduce.manager.structures import (
-    WorkerStatus,
-    WorkerInfo,
-    PartitionInfo,
-)
+
+import click
+
+import mapreduce.utils
+from mapreduce.manager.structures import (PartitionInfo, WorkerInfo,
+                                          WorkerStatus)
 
 # Configure logging
 LOGGER = logging.getLogger(__name__)
@@ -38,7 +36,7 @@ class Manager:
         # create an array to store all the info of workers
         self.port = port
         self.host = host
-        self.finishNum = 0
+        self.finish_num = 0
         self.workers: Dict[Tuple[Any, Any], WorkerInfo] = {}
         # (host, port) -> WorkerInfo
         self.job_queue = collections.deque()
@@ -73,7 +71,7 @@ class Manager:
             while True:
                 # Accept a connection from a worker
                 try:
-                    conn, addr = self.tcp_socket.accept()
+                    conn, _ = self.tcp_socket.accept()
                 except socket.timeout:
                     continue
                 conn.settimeout(1)
@@ -281,9 +279,9 @@ class Manager:
         for task_id, partition_files in enumerate(file_partitions):
             part = PartitionInfo(task_id=task_id, files=partition_files)
             self.partitions.append(part)
-            self.finishNum += 1
+            self.finish_num += 1
 
-        while self.finishNum:
+        while self.finish_num:
             # loop until all tasks are finished
             if self.partitions:
                 # if there are still partitions(works) to be assigned
@@ -347,9 +345,9 @@ class Manager:
             self.partitions.append(
                 PartitionInfo(task_id=task_id, files=input_paths)
             )
-            self.finishNum += 1
+            self.finish_num += 1
 
-        while self.finishNum:
+        while self.finish_num:
             # loop until all tasks are finished
             if self.partitions:
                 # if there are still partitions(works) to be assigned
@@ -403,7 +401,7 @@ class Manager:
 
     def handle_finished(self, message_dict):
         """Handle a finished task message."""
-        self.finishNum -= 1
+        self.finish_num -= 1
         for worker_key, worker in self.workers.items():
             if worker.task.task_id == message_dict["task_id"]:
                 print(111111)

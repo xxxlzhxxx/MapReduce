@@ -1,16 +1,16 @@
 """MapReduce framework Worker node."""
-import os
-import logging
-import json
-import time
-import tempfile
-import socket
-import shutil
-import threading
 import hashlib
-import subprocess
 import heapq
+import json
+import logging
+import os
 import pathlib
+import shutil
+import socket
+import subprocess
+import tempfile
+import threading
+import time
 
 LOGGER = logging.getLogger(__name__)
 
