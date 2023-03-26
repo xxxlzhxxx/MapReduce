@@ -163,19 +163,25 @@ class Worker:
                         LOGGER.info(
                             "Executed %s input=%s", executable, input_path
                         )
-                        for line in map_process.stdout:
-                            key, _ = line.split("\t")
-                            partition_number = self.calculate_partition(
-                                key, message_dict["num_partitions"]
-                            )
-                            intermediate_file = os.path.join(
-                                tmpdir,
-                                f"maptask{message_dict['task_id']:05}"
-                                + f"-part{partition_number:05}",
-                            )
-                            with open(intermediate_file, "a",
-                                      encoding="utf8") as this_file:
-                                this_file.write(line)
+                        # LOGGER.debug("writing to temp")
+                        with ExitStack() as stack:
+                            file_objects = {}
+                            for line in map_process.stdout:
+                                key, _ = line.split("\t")
+                                partition_number = self.calculate_partition(
+                                    key, message_dict["num_partitions"])
+                                intermediate_file = os.path.join(
+                                    tmpdir,
+                                    f"maptask{message_dict['task_id']:05}-part{partition_number:05}",
+                                )
+
+                                # Open the file if it's not already opened and store the file object in the dictionary
+                                if intermediate_file not in file_objects:
+                                    file_objects[intermediate_file] = stack.enter_context(
+                                        open(intermediate_file, "a", encoding="utf8")
+                                    )
+                                file_objects[intermediate_file].write(line)
+                        # LOGGER.debug("writing done")
             self.handle_sorting(tmpdir, message_dict)
         LOGGER.info("Removed %s", tmpdir)
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
@@ -196,20 +202,14 @@ class Worker:
 
     def handle_sorting(self, tmpdir, message_dict):
         """Handle sorting task."""
+        LOGGER.info("Sorting %s", tmpdir)
         with ExitStack() as stack:
-            # Open all input and output files at the same time
-            inf = []
-            ouf = []
-            for file in os.listdir(tmpdir):
-                path = os.path.join(tmpdir, file)
-                in_put = stack.enter_context(open(path, "r", encoding="utf8"))
-                inf.append(in_put)
-                path = os.path.join(message_dict["output_directory"], file)
-                output = stack.enter_context(open(path, "w", encoding="utf8"))
-                ouf.append(output)
+            inf = [stack.enter_context(open(os.path.join(tmpdir, file), "r", encoding="utf8")) for file in os.listdir(tmpdir)]
+            ouf = [stack.enter_context(open(os.path.join(message_dict["output_directory"], file), "w", encoding="utf8")) for file in os.listdir(tmpdir)]
             for i, input_file in enumerate(inf):
                 sorted_lines = sorted(input_file.readlines())
                 ouf[i].writelines(sorted_lines)
+        LOGGER.info("Sorting Done")
 
     def handle_reducing(self, message_dict):
         """Handle reducing task."""
