@@ -148,14 +148,14 @@ class Worker:
 
     def handle_mapping(self, message_dict):
         """Handle mapping task."""
-        executable = message_dict["executable"]
         prefix = f"mapreduce-local-task{message_dict['task_id']:05}-"
+        executable = message_dict["executable"]
         with tempfile.TemporaryDirectory(prefix=prefix) as tmpdir:
             for input_path in message_dict["input_paths"]:
                 LOGGER.info("Created %s", tmpdir)
                 with open(input_path, encoding="utf8") as infile:
                     with subprocess.Popen(
-                        [executable],
+                        [message_dict["executable"]],
                         stdin=infile,
                         stdout=subprocess.PIPE,
                         text=True,
@@ -165,12 +165,8 @@ class Worker:
                         )
                         for line in map_process.stdout:
                             key, _ = line.split("\t")
-                            hexdigest = hashlib.md5(
-                                key.encode("utf-8")
-                            ).hexdigest()
-                            keyhash = int(hexdigest, base=16)
-                            partition_number = (
-                                keyhash % message_dict["num_partitions"]
+                            partition_number = self.calculate_partition(
+                                key, message_dict["num_partitions"]
                             )
                             intermediate_file = os.path.join(
                                 tmpdir,
@@ -180,21 +176,7 @@ class Worker:
                             with open(intermediate_file, "a",
                                       encoding="utf8") as this_file:
                                 this_file.write(line)
-            for file in os.listdir(tmpdir):
-                with open(os.path.join(tmpdir, file), "r",
-                          encoding="utf8") as this_file:
-                    sorted_line = sorted(this_file.readlines())
-                with open(os.path.join(tmpdir, file), "w",
-                          encoding="utf8") as this_file:
-                    this_file.writelines(sorted_line)
-                LOGGER.info("Sorted %s", os.path.join(tmpdir, file))
-            for file in os.listdir(tmpdir):
-                old_path = os.path.join(tmpdir, file)
-                output_path = os.path.join(
-                    message_dict["output_directory"], file
-                )
-                shutil.move(old_path, output_path)
-                LOGGER.info("Moved %s -> %s", old_path, output_path)
+            self.handle_sorting(tmpdir, message_dict)
         LOGGER.info("Removed %s", tmpdir)
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
             sock.connect((self.manager_host, self.manager_port))
@@ -205,6 +187,29 @@ class Worker:
                 "worker_port": self.port,
             }
             sock.sendall(json.dumps(message).encode("utf-8"))
+
+    def calculate_partition(self, key, num_partitions):
+        """Calculate partition number."""
+        hexdigest = hashlib.md5(key.encode("utf-8")).hexdigest()
+        keyhash = int(hexdigest, base=16)
+        return keyhash % num_partitions
+
+    def handle_sorting(self, tmpdir, message_dict):
+        """Handle sorting task."""
+        with ExitStack() as stack:
+            # Open all input and output files at the same time
+            inf = []
+            ouf = []
+            for file in os.listdir(tmpdir):
+                path = os.path.join(tmpdir, file)
+                in_put = stack.enter_context(open(path, "r", encoding="utf8"))
+                inf.append(in_put)
+                path = os.path.join(message_dict["output_directory"], file)
+                output = stack.enter_context(open(path, "w", encoding="utf8"))
+                ouf.append(output)
+            for i, input_file in enumerate(inf):
+                sorted_lines = sorted(input_file.readlines())
+                ouf[i].writelines(sorted_lines)
 
     def handle_reducing(self, message_dict):
         """Handle reducing task."""

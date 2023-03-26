@@ -43,13 +43,11 @@ def worker_message_generator(mock_sendall, tmp_path):
     # tmpdir to simulate the Manager calling recv() when there's nothing
     # to receive.
     tmpdir_job0 = None
-    print('send jobs finished')
     for tmpdir_job0 in (
         utils.wait_for_exists_glob(f"{tmp_path}/mapreduce-shared-job00000-*")
     ):
         yield None
 
-    print('created dir')
     # Simulate files created by Worker.  The files are empty because the
     # Manager does not read the contents, just the filenames.
     (tmpdir_job0/"maptask00000-part00000").touch()
@@ -60,7 +58,6 @@ def worker_message_generator(mock_sendall, tmp_path):
     # Transfer control back to solution under test in between each check for
     # map messages to simulate the Manager calling recv() when there's nothing
     # to receive.
-
     for _ in utils.wait_for_map_messages(mock_sendall, num=2):
         yield None
 
@@ -86,13 +83,7 @@ def worker_message_generator(mock_sendall, tmp_path):
     # to receive.
     for _ in utils.wait_for_map_messages(mock_sendall, num=3):
         yield None
-    print ("for map message")
-    yield json.dumps({
-        "message_type": "test before"
-    }).encode("utf-8")
-    yield None
 
-    
     # Status finished messages from one mapper.  This Worker was reassigned the
     # task that the dead Worker failed to complete.
     yield json.dumps({
@@ -101,10 +92,6 @@ def worker_message_generator(mock_sendall, tmp_path):
         "worker_host": "localhost",
         "worker_port": 3001,
     }).encode("utf-8")
-    print("sent")
-    yield json.dumps({
-        "message_type": "test"
-    }).encode("utf-8")
     yield None
 
     # Wait for Manager to send reduce job message
@@ -112,7 +99,6 @@ def worker_message_generator(mock_sendall, tmp_path):
     # Transfer control back to solution under test in between each check for
     # reduce messages to simulate the Manager calling recv() when there's
     # nothing to receive.
-    print ("before reduce")
     for _ in utils.wait_for_reduce_messages(mock_sendall, num=1):
         yield None
 

@@ -16,10 +16,10 @@ from mapreduce.manager.manager import Manager
 def main(host, port, logfile, loglevel, shared_dir):
     """Run Manager."""
     tempfile.tempdir = shared_dir
-    if logfile:
-        handler = logging.FileHandler(logfile)
-    else:
+    if not logfile:
         handler = logging.StreamHandler()
+    else:
+        handler = logging.FileHandler(logfile)
     formatter = logging.Formatter(
         f"Manager:{port} [%(levelname)s] %(message)s"
     )
