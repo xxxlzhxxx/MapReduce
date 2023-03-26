@@ -19,51 +19,75 @@ import click
 # Configure command line options
 @click.command()
 @click.option(
-    "--host", "-h", "host", default="localhost",
+    "--host",
+    "-h",
+    "host",
+    default="localhost",
     help="Manager host, default=localhost",
 )
 @click.option(
-    "--port", "-p", "port", default=6000,
+    "--port",
+    "-p",
+    "port",
+    default=6000,
     help="Manager port number, default=6000",
 )
 @click.option(
-    "--input", "-i", "input_directory", default="tests/testdata/input",
+    "--input",
+    "-i",
+    "input_directory",
+    default="tests/testdata/input",
     help="Input directory, default=tests/testdata/input",
     type=click.Path(file_okay=False, dir_okay=True),
 )
 @click.option(
-    "--output", "-o", "output_directory", default="output",
+    "--output",
+    "-o",
+    "output_directory",
+    default="output",
     help="Output directory, default=output",
     type=click.Path(exists=False, file_okay=False, dir_okay=True),
 )
 @click.option(
-    "--mapper", "-m", "mapper_executable",
+    "--mapper",
+    "-m",
+    "mapper_executable",
     default="tests/testdata/exec/wc_map.sh",
     help="Mapper executable, default=tests/testdata/exec/wc_map.sh",
     type=click.Path(file_okay=True, dir_okay=False),
 )
 @click.option(
-    "--reducer", "-r", "reducer_executable",
+    "--reducer",
+    "-r",
+    "reducer_executable",
     default="tests/testdata/exec/wc_reduce.sh",
     help="Reducer executable, default=tests/testdata/exec/wc_reduce.sh",
     type=click.Path(file_okay=True, dir_okay=False),
 )
 @click.option(
-    "--nmappers", "num_mappers", default=2, type=int,
+    "--nmappers",
+    "num_mappers",
+    default=2,
+    type=int,
     help="Number of mappers, default=2",
 )
 @click.option(
-    "--nreducers", "num_reducers", default=2, type=int,
+    "--nreducers",
+    "num_reducers",
+    default=2,
+    type=int,
     help="Number of reducers, default=2",
 )
-def main(host: str,
-         port: int,
-         input_directory: str,
-         output_directory: str,
-         mapper_executable: str,
-         reducer_executable: str,
-         num_mappers: int,
-         num_reducers: int) -> None:
+def main(
+    host: str,
+    port: int,
+    input_directory: str,
+    output_directory: str,
+    mapper_executable: str,
+    reducer_executable: str,
+    num_mappers: int,
+    num_reducers: int,
+) -> None:
     """Top level command line interface."""
     # We want a bunch of arguments, this is the top level CLI.
     # pylint: disable=too-many-arguments
@@ -74,7 +98,7 @@ def main(host: str,
         "mapper_executable": mapper_executable,
         "reducer_executable": reducer_executable,
         "num_mappers": num_mappers,
-        "num_reducers": num_reducers
+        "num_reducers": num_reducers,
     }
 
     # Send the data to the port that Manager is on

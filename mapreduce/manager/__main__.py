@@ -37,5 +37,6 @@ def main(host, port, logfile, loglevel, shared_dir):
     root_logger.setLevel(loglevel.upper())
     Manager(host, port)
 
+
 if __name__ == "__main__":
     main()
