@@ -178,10 +178,11 @@ class Worker:
 
                                 # Open the file if it's not already opened
                                 if intermediate_file not in file_objects:
-                                    file_objects[intermediate_file] = stack.enter_context(
-                                        open(intermediate_file,
-                                             "a", encoding="utf8")
-                                    )
+                                    file_objects[intermediate_file] = (
+                                        stack.enter_context(
+                                            open(intermediate_file,
+                                                 "a", encoding="utf8")
+                                        ))
                                 file_objects[intermediate_file].write(line)
                         # LOGGER.debug("writing done")
             self.handle_sorting(tmpdir, message_dict)
@@ -207,7 +208,8 @@ class Worker:
         LOGGER.info("Sorting %s", tmpdir)
         with ExitStack() as stack:
             inf = [stack.enter_context(open(os.path.join(
-                tmpdir, file), "r", encoding="utf8")) for file in os.listdir(tmpdir)]
+                tmpdir, file), "r", encoding="utf8"))
+                for file in os.listdir(tmpdir)]
             ouf = [stack.enter_context(open(os.path.join(
                 message_dict["output_directory"], file), "w", encoding="utf8"))
                 for file in os.listdir(tmpdir)]
